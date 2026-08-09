@@ -57,6 +57,12 @@ npm run db:studio     # inspect the data
 production (`npx wrangler secret put DATABASE_URL`). It is never committed, never
 prefixed `NEXT_PUBLIC_`, and never serialized into client props.
 
+Piping the secret from PowerShell prepends a UTF-8 BOM, which makes Neon reject an
+otherwise correct connection string with "is not a valid URL". `getDb()` now strips a
+leading BOM and surrounding whitespace, but prefer feeding the secret from a BOM-free
+source anyway. `npx wrangler tail` is how that was diagnosed — it shows the real
+server-side error while users only see the branded error page.
+
 ## Routes
 
 | Route | Rendering | Notes |
