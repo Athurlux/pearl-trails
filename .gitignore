@@ -1,0 +1,49 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build output
+dist/
+build/
+out/
+.next/
+.output/
+
+# Next.js / TypeScript generated files
+next-env.d.ts
+*.tsbuildinfo
+
+# Cloudflare Workers / OpenNext build + local state
+.open-next/
+.wrangler/
+cloudflare-env.d.ts
+.dev.vars
+.dev.vars.*
+
+# Environment — never commit real secrets
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Editor / OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Test / coverage
+coverage/
+.nyc_output/
+
+# Local scratch
+*.local
+tmp/
