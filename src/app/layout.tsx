@@ -19,7 +19,12 @@ const inter = Inter({
   display: "swap",
 });
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://pearl-trails.pages.dev";
+/**
+ * Canonical origin. Inlined at build time, so a custom domain means setting
+ * NEXT_PUBLIC_SITE_URL before `npm run deploy` — not a runtime binding.
+ */
+const siteUrl =
+  process.env.NEXT_PUBLIC_SITE_URL ?? "https://pearl-trails.kranks533.workers.dev";
 const title = "Pearl Trails — Discover Uganda differently";
 const description =
   "Find remarkable lodges, campsites and unforgettable experiences across the most beautiful destinations in Uganda.";
