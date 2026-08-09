@@ -4,6 +4,47 @@
 
 Lodges, campsites and experiences across Uganda — the Pearl of Africa.
 
+## Release 2 — Explore Stays
+
+`/stays` is a database-backed discovery experience: search, filter, sort and page through
+a catalogue of Ugandan lodges, campsites, cabins and lakeside retreats.
+
+- **Search** — Postgres full-text over name, summary and description (weighted, GIN
+  indexed), with a substring fallback so partial words still match.
+- **Filters** — destination, stay type (multi), max price, guests, minimum rating, and
+  amenities (AND semantics: "pool and Wi-Fi" means both).
+- **Sort** — Recommended (featured, then rating; relevance first when searching), price
+  low→high, price high→low, top rated. Every ordering ends with `id` so pages are stable.
+- **State lives in the URL** — every search is shareable, survives refresh, and the back
+  button steps through it.
+- **Mobile** — a bottom sheet with a live "Show N stays" button, not a squeezed sidebar.
+- **Saved stays** — localStorage only. No accounts in this release.
+
+Dates are carried through the URL and shown in the hero, but there is no availability
+model yet, so the page never claims a stay is free on them.
+
+### Database
+
+Neon PostgreSQL, accessed with Drizzle ORM over the Neon **HTTP** driver — Workers cannot
+open raw TCP sockets, so pooled/websocket drivers are the wrong tool. Four tables:
+`destinations`, `stays`, `amenities`, `stay_amenities`.
+
+```bash
+cp .env.example .env.local     # then paste your Neon connection string
+npm run db:migrate             # apply migrations in drizzle/
+npm run db:seed                # 8 destinations, 12 amenities, 22 stays
+```
+
+The seed is **idempotent** — every write upserts on a natural slug and amenity links are
+replaced rather than appended, so re-running it produces the same database. It is an
+operator command only; nothing invokes it automatically.
+
+For production, `DATABASE_URL` is a Worker secret:
+
+```bash
+npx wrangler secret put DATABASE_URL
+```
+
 ## Release 1 — landing page
 
 Release 1 is a single, complete marketing landing page. It is deliberately not the
@@ -38,7 +79,9 @@ lodging listings.
 | Styling | Tailwind CSS v4 (CSS-first `@theme`) |
 | Fonts | Fraunces + Inter via `next/font/google` |
 | Hosting | Cloudflare Workers via `@opennextjs/cloudflare` |
-| Database | **None in Release 1** — Neon PostgreSQL is deferred |
+| Database | Neon PostgreSQL |
+| ORM | Drizzle (`drizzle-orm/neon-http`) |
+| Tests | Vitest |
 
 `@opennextjs/cloudflare` on Workers is the current, supported path. The older
 `@cloudflare/next-on-pages` adapter and Cloudflare Pages deployment are deprecated for
@@ -67,10 +110,23 @@ npm run dev          # local dev server
 npm run build        # production build
 npm run lint         # eslint
 npm run typecheck    # tsc --noEmit
+npm run test         # vitest — DB tests skip themselves without DATABASE_URL
+npm run db:generate  # write a migration from schema changes
+npm run db:migrate   # apply pending migrations
+npm run db:seed      # idempotent demo catalogue
+npm run db:studio    # inspect the database
 npm run preview      # build for Workers and preview in the Workers runtime
 npm run deploy       # build and deploy to Cloudflare Workers
 npm run cf-typegen   # regenerate Cloudflare env types
 ```
+
+### Deploying
+
+1. `npm run lint && npm run typecheck && npm test`
+2. `npm run db:migrate` against the target database
+3. `npm run deploy`
+4. Cold-load `/` and `/stays` on the deployed URL and confirm the filters respond — a
+   client-side navigation can mask a hydration failure that a fresh load exposes.
 
 ## Layout
 
@@ -78,10 +134,12 @@ npm run cf-typegen   # regenerate Cloudflare env types
 public/brand/        integrated brand assets (logos, marks, app icons)
 public/img/          licensed photography — see docs/IMAGE-CREDITS.md
 assets/brand/        untouched original brand kit
-src/app/             layout, page, global styles, favicon
-src/components/      layout/, sections/, ui/
-src/data/            demo data + shared types
-src/lib/             formatting + the cross-island search store
+drizzle/             generated SQL migrations
+src/app/             routes: /, /stays, /stays/[slug]
+src/components/      layout/, sections/ (landing), stays/ (explore), ui/
+src/db/              schema, connection, seed data, seed script
+src/data/            editorial content that is not catalogue data
+src/lib/             query layer, URL param parsing, formatting, saved stays
 docs/                planning, decisions, image credits
 wrangler.jsonc       Cloudflare Worker configuration
 open-next.config.ts  OpenNext adapter configuration
@@ -96,9 +154,10 @@ reveal effect never hides content when scripting is unavailable.
 
 ## Deferred
 
-Neon PostgreSQL, real availability and booking, payments, accounts, owner tooling,
-notifications, search infrastructure, and per-stay detail pages. See
-`docs/decisions/` for the reasoning as those land.
+Real availability and booking, payments, accounts, owner tooling, notifications, and the
+full property-detail experience (Release 3). External search infrastructure is
+deliberately not used — Postgres is more than sufficient at this scale, and the query
+layer is separated from the UI so that can change without touching components.
 
 ## Credits
 

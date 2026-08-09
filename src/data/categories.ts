@@ -1,10 +1,24 @@
-import type { StayCategory } from "./types";
+import type { StayType } from "@/lib/stay-types";
 
 /**
- * Categories reuse the stay photography deliberately — every image in this
- * project was checked against the place it claims to show, and there is a small
- * verified pool rather than a large unverified one.
+ * Editorial framing for the stay-type filters.
+ *
+ * The copy and photography live here; the counts do not — those come from the
+ * database at render time, because a category tile claiming "42 safari lodges"
+ * when the catalogue holds four is a false statement, not a placeholder.
+ *
+ * `types` is what the tile actually filters by, so a tile can group more than
+ * one stay type without inventing a category the database does not know about.
  */
+export interface StayCategory {
+  slug: string;
+  name: string;
+  description: string;
+  image: string;
+  imageAlt: string;
+  types: StayType[];
+}
+
 export const categories: StayCategory[] = [
   {
     slug: "safari-lodges",
@@ -12,7 +26,7 @@ export const categories: StayCategory[] = [
     description: "Full service, close to the game.",
     image: "/img/stay-kazinga.jpg",
     imageAlt: "Open-sided lodge lounge beneath a high thatched roof",
-    count: 42,
+    types: ["safari-lodge"],
   },
   {
     slug: "campsites",
@@ -20,7 +34,7 @@ export const categories: StayCategory[] = [
     description: "Pitch up where the quiet is.",
     image: "/img/stay-forest-canopy.jpg",
     imageAlt: "Small dome tents pitched on grass beside dense green vegetation",
-    count: 31,
+    types: ["campsite"],
   },
   {
     slug: "eco-lodges",
@@ -28,7 +42,7 @@ export const categories: StayCategory[] = [
     description: "Low impact, deep in the landscape.",
     image: "/img/stay-kidepo-plains.jpg",
     imageAlt: "Timber deck with open-air bathing looking out over wild bush",
-    count: 26,
+    types: ["eco-lodge"],
   },
   {
     slug: "tented-camps",
@@ -36,7 +50,7 @@ export const categories: StayCategory[] = [
     description: "Canvas walls, uninterrupted sound.",
     image: "/img/stay-bunyonyi-ridge.jpg",
     imageAlt: "Large canvas safari tent open to a green clearing",
-    count: 19,
+    types: ["tented-camp"],
   },
   {
     slug: "cabins-cottages",
@@ -44,7 +58,7 @@ export const categories: StayCategory[] = [
     description: "Solid walls, wood smoke, long mornings.",
     image: "/img/stay-jinja-cabins.jpg",
     imageAlt: "Timber cottage with a veranda surrounded by forest and planted gardens",
-    count: 23,
+    types: ["cabin", "cottage"],
   },
   {
     slug: "lakeside-stays",
@@ -52,6 +66,6 @@ export const categories: StayCategory[] = [
     description: "Water at the doorstep.",
     image: "/img/dest-bunyonyi.jpg",
     imageAlt: "Hillsides dropping into a still lake",
-    count: 17,
+    types: ["lakeside-stay"],
   },
 ];

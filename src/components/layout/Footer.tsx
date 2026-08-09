@@ -1,14 +1,20 @@
 import Image from "next/image";
-import { destinations } from "@/data/destinations";
+import Link from "next/link";
+import { listDestinations } from "@/lib/stays-query";
 
 const siteLinks = [
-  { href: "#stays", label: "Exceptional stays" },
-  { href: "#destinations", label: "Explore Uganda" },
-  { href: "#experiences", label: "Experiences" },
-  { href: "#about", label: "Why Pearl Trails" },
+  { href: "/stays", label: "Explore stays" },
+  { href: "/#destinations", label: "Explore Uganda" },
+  { href: "/#experiences", label: "Experiences" },
+  { href: "/#about", label: "Why Pearl Trails" },
 ];
 
-export function Footer() {
+/**
+ * Server Component. Destination links come from the catalogue rather than a
+ * hardcoded list, so the footer cannot advertise a destination we do not have.
+ */
+export async function Footer() {
+  const destinations = await listDestinations();
   const year = 2026;
 
   return (
@@ -36,12 +42,12 @@ export function Footer() {
             <ul className="mt-5 space-y-3">
               {siteLinks.map((link) => (
                 <li key={link.href}>
-                  <a
+                  <Link
                     href={link.href}
                     className="text-[0.95rem] text-ivory/70 transition-colors hover:text-ivory"
                   >
                     {link.label}
-                  </a>
+                  </Link>
                 </li>
               ))}
             </ul>
@@ -54,12 +60,12 @@ export function Footer() {
             <ul className="mt-5 grid grid-cols-2 gap-x-6 gap-y-3">
               {destinations.map((destination) => (
                 <li key={destination.slug}>
-                  <a
-                    href="#destinations"
+                  <Link
+                    href={`/stays?destination=${destination.slug}`}
                     className="text-[0.95rem] text-ivory/70 transition-colors hover:text-ivory"
                   >
                     {destination.name}
-                  </a>
+                  </Link>
                 </li>
               ))}
             </ul>

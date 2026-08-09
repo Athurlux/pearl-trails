@@ -4,11 +4,15 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+/**
+ * Absolute hrefs, not bare hashes: the header now renders on /stays too, where
+ * "#destinations" would scroll to nothing. "/#destinations" works from anywhere.
+ */
 const navLinks = [
-  { label: "Stays", href: "#stays" },
-  { label: "Destinations", href: "#destinations" },
-  { label: "Experiences", href: "#experiences" },
-  { label: "About", href: "#about" },
+  { label: "Stays", href: "/stays" },
+  { label: "Destinations", href: "/#destinations" },
+  { label: "Experiences", href: "/#experiences" },
+  { label: "About", href: "/#about" },
 ];
 
 export function Header() {
@@ -65,7 +69,7 @@ export function Header() {
           <ul className="flex items-center gap-9">
             {navLinks.map((l) => (
               <li key={l.href}>
-                <a
+                <Link
                   href={l.href}
                   className={[
                     "text-[0.9rem] tracking-wide transition-colors",
@@ -73,24 +77,29 @@ export function Header() {
                   ].join(" ")}
                 >
                   {l.label}
-                </a>
+                </Link>
               </li>
             ))}
           </ul>
         </nav>
 
+        {/*
+          The Release 1 "Sign in" link pointed at an anchor and did nothing.
+          There are no accounts yet, so rather than keep a dead affordance the
+          slot now carries the primary journey into Explore.
+        */}
         <div className="hidden items-center gap-6 lg:flex">
-          <a
-            href="#stays"
+          <Link
+            href="/#about"
             className={[
               "text-[0.9rem] transition-colors",
               solid ? "text-ink/70 hover:text-forest" : "text-ivory/85 hover:text-white",
             ].join(" ")}
           >
-            Sign in
-          </a>
-          <a
-            href="#destinations"
+            Why Pearl Trails
+          </Link>
+          <Link
+            href="/stays"
             className={[
               "rounded-sm px-5 py-2.5 text-[0.85rem] font-medium tracking-wide transition-all duration-300",
               solid
@@ -98,8 +107,8 @@ export function Header() {
                 : "bg-ivory/95 text-forest hover:bg-white",
             ].join(" ")}
           >
-            Explore Uganda
-          </a>
+            Explore Stays
+          </Link>
         </div>
 
         <button
@@ -146,31 +155,31 @@ export function Header() {
           <ul className="space-y-1">
             {navLinks.map((l) => (
               <li key={l.href}>
-                <a
+                <Link
                   href={l.href}
                   onClick={() => setOpen(false)}
                   className="block border-b border-line/70 py-4 font-display text-2xl text-forest"
                 >
                   {l.label}
-                </a>
+                </Link>
               </li>
             ))}
           </ul>
           <div className="mt-7 flex flex-col gap-3">
-            <a
-              href="#destinations"
+            <Link
+              href="/stays"
               onClick={() => setOpen(false)}
               className="rounded-sm bg-forest px-5 py-3.5 text-center text-sm font-medium tracking-wide text-ivory"
             >
-              Explore Uganda
-            </a>
-            <a
-              href="#stays"
+              Explore Stays
+            </Link>
+            <Link
+              href="/#about"
               onClick={() => setOpen(false)}
               className="rounded-sm border border-line px-5 py-3.5 text-center text-sm text-forest"
             >
-              Sign in
-            </a>
+              Why Pearl Trails
+            </Link>
           </div>
           <p className="eyebrow mt-8 text-muted">Stays that stay with you</p>
         </nav>

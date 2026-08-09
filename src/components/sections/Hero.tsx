@@ -1,7 +1,12 @@
 import Image from "next/image";
+import Link from "next/link";
 import { SearchBar } from "./SearchBar";
 
-export function Hero() {
+export function Hero({
+  destinations,
+}: {
+  destinations: { slug: string; name: string }[];
+}) {
   return (
     <section className="relative isolate min-h-[92svh] w-full overflow-hidden bg-forest-deep lg:min-h-[100svh]">
       <Image
@@ -41,12 +46,12 @@ export function Hero() {
           </p>
 
           <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
-            <a
-              href="#stays"
+            <Link
+              href="/stays"
               className="rounded-sm bg-ivory px-8 py-4 text-center text-sm font-medium tracking-wide text-forest transition-colors hover:bg-white"
             >
               Explore Stays
-            </a>
+            </Link>
             <a
               href="#experiences"
               className="rounded-sm border border-ivory/45 px-8 py-4 text-center text-sm font-medium tracking-wide text-ivory transition-colors hover:border-ivory hover:bg-ivory/10"
@@ -57,7 +62,7 @@ export function Hero() {
         </div>
 
         <div className="mt-10 lg:mt-14">
-          <SearchBar />
+          <SearchBar destinations={destinations} />
         </div>
       </div>
     </section>

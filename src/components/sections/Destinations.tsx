@@ -1,8 +1,18 @@
 import Image from "next/image";
-import { destinations } from "@/data/destinations";
+import Link from "next/link";
 import { Reveal } from "@/components/ui/Reveal";
 import { SectionHeading } from "@/components/ui/SectionHeading";
-import type { Destination } from "@/data/types";
+
+interface Destination {
+  slug: string;
+  name: string;
+  region: string;
+  tagline: string;
+  blurb: string;
+  image: string;
+  imageAlt: string;
+  stayCount: number;
+}
 
 function DestinationTile({
   destination,
@@ -45,7 +55,13 @@ function DestinationTile({
             isLarge ? "text-[clamp(1.9rem,3vw,2.6rem)]" : "text-2xl",
           ].join(" ")}
         >
-          {destination.name}
+          {/* The tile is now a real entry point into Explore, not decoration. */}
+          <Link
+            href={`/stays?destination=${destination.slug}`}
+            className="after:absolute after:inset-0"
+          >
+            {destination.name}
+          </Link>
         </h3>
         <p className="mt-2 max-w-md text-[0.95rem] leading-snug text-ivory/80">
           {destination.tagline}
@@ -56,15 +72,16 @@ function DestinationTile({
           </p>
         ) : null}
         <p className="mt-4 text-[0.78rem] tracking-wide text-ivory/55">
-          {destination.staysCount} stays
+          {destination.stayCount} {destination.stayCount === 1 ? "stay" : "stays"}
         </p>
       </div>
     </Reveal>
   );
 }
 
-export function Destinations() {
-  const [bwindi, murchison, queen, kidepo, bunyonyi, jinja] = destinations;
+export function Destinations({ destinations }: { destinations: Destination[] }) {
+  const [first, second, ...rest] = destinations;
+  if (!first) return null;
 
   return (
     <section id="destinations" className="scroll-mt-20 bg-ivory py-20 lg:py-28">
@@ -73,29 +90,46 @@ export function Destinations() {
           eyebrow="Explore Uganda"
           title={
             <>
-              Six places worth
+              Eight places worth
               <br className="hidden sm:block" /> rearranging a year for.
             </>
           }
           intro="From forest that swallows sound to a valley most travellers never reach — start with where you want to wake up."
+          action={
+            <Link
+              href="/stays"
+              className="inline-flex items-center gap-2 border-b border-forest/25 pb-1 text-sm tracking-wide text-forest transition-colors hover:border-forest"
+            >
+              Explore all stays
+              <span aria-hidden="true">&rarr;</span>
+            </Link>
+          }
         />
 
         {/* Deliberately asymmetric: two anchors, then a quieter row. */}
         <div className="mt-12 grid gap-4 lg:mt-16 lg:grid-cols-12">
           <div className="lg:col-span-7">
-            <DestinationTile destination={bwindi} size="large" priorityIndex={0} />
+            <DestinationTile destination={first} size="large" priorityIndex={0} />
           </div>
-          <div className="lg:col-span-5">
-            <DestinationTile destination={kidepo} size="large" priorityIndex={1} />
-          </div>
+          {second ? (
+            <div className="lg:col-span-5">
+              <DestinationTile destination={second} size="large" priorityIndex={1} />
+            </div>
+          ) : null}
         </div>
 
-        <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <DestinationTile destination={murchison} size="small" priorityIndex={0} />
-          <DestinationTile destination={queen} size="small" priorityIndex={1} />
-          <DestinationTile destination={bunyonyi} size="small" priorityIndex={2} />
-          <DestinationTile destination={jinja} size="small" priorityIndex={3} />
-        </div>
+        {rest.length > 0 ? (
+          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {rest.map((d, i) => (
+              <DestinationTile
+                key={d.slug}
+                destination={d}
+                size="small"
+                priorityIndex={i % 3}
+              />
+            ))}
+          </div>
+        ) : null}
       </div>
     </section>
   );

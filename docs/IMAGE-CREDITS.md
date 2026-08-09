@@ -17,6 +17,19 @@ removed and replaced rather than shipped as Ugandan lodges. Any future image add
 this project gets the same treatment: view it, confirm it plausibly depicts the place
 it claims to, then write an `imageAlt` that describes what is actually in the frame.
 
+Release 2 added fifteen stay photographs in `public/img/stays/` plus destination images
+for Sipi Falls and Fort Portal. All were reviewed on a single contact sheet before use;
+six candidates were rejected — two desert scenes, one showing a real camp's name on a
+sign, one near-duplicate of an existing photo, and two too weak to carry a card. One more
+was dropped after it turned out to be the same room, from the same shoot, as an image
+already in use.
+
+**No two stays share a photograph.** Enforced by the seed and checked in the database:
+
+```sql
+SELECT count(*), count(DISTINCT image) FROM stays;  -- must be equal
+```
+
 ## Files
 
 | File | Used for |
