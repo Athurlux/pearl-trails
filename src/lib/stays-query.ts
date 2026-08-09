@@ -1,7 +1,16 @@
 import "server-only";
-import { and, asc, desc, eq, gte, ilike, inArray, lte, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, ilike, inArray, lte, ne, or, sql } from "drizzle-orm";
 import { getDb } from "@/db";
-import { amenities, destinations, stayAmenities, stays } from "@/db/schema";
+import {
+  accommodationOptions,
+  amenities,
+  destinations,
+  experiences,
+  stayAmenities,
+  stayExperiences,
+  stayImages,
+  stays,
+} from "@/db/schema";
 import { STAY_TYPES, type StayType } from "./stay-types";
 import { PAGE_SIZE, type StaysParams } from "./stays-params";
 
@@ -329,4 +338,265 @@ export async function findStayBySlug(slug: string) {
 
   if (!row) return null;
   return { ...row, rating: Number(row.rating) };
+}
+
+export interface PropertyDetail {
+  id: number;
+  slug: string;
+  name: string;
+  stayType: StayType;
+  shortDescription: string;
+  description: string;
+  priceFromUgx: number;
+  currency: string;
+  rating: number;
+  reviewCount: number;
+  maxGuests: number;
+  image: string;
+  imageAlt: string;
+  latitude: number | null;
+  longitude: number | null;
+  highlights: string[];
+  locationNote: string | null;
+  gettingThere: string | null;
+  checkInTime: string;
+  checkOutTime: string;
+  childrenNote: string | null;
+  petsNote: string | null;
+  smokingNote: string | null;
+  mealsNote: string | null;
+  accessibilityNote: string | null;
+  ratingBreakdown: { label: string; value: number }[];
+  destination: { slug: string; name: string; region: string; blurb: string };
+  gallery: { url: string; alt: string }[];
+  amenities: { slug: string; name: string }[];
+  options: {
+    id: number;
+    slug: string;
+    name: string;
+    shortDescription: string;
+    guestCapacity: number;
+    bedDescription: string;
+    priceFromUgx: number;
+    currency: string;
+    sizeSqm: number | null;
+    features: string[];
+    image: string;
+    imageAlt: string;
+  }[];
+  experiences: {
+    slug: string;
+    name: string;
+    shortDescription: string;
+    category: string;
+    duration: string;
+    priceFromUgx: number | null;
+    image: string;
+    imageAlt: string;
+  }[];
+}
+
+/**
+ * Everything one property page needs.
+ *
+ * The stay is fetched by its unique slug index first; the five dependent
+ * queries then run concurrently and are each scoped to that one stay. No
+ * query here is unbounded and none of them loops per row.
+ */
+export async function getPropertyDetail(slug: string): Promise<PropertyDetail | null> {
+  const db = getDb();
+
+  const [stay] = await db
+    .select({
+      id: stays.id,
+      slug: stays.slug,
+      name: stays.name,
+      stayType: stays.stayType,
+      shortDescription: stays.shortDescription,
+      description: stays.description,
+      priceFromUgx: stays.priceFromUgx,
+      currency: stays.currency,
+      rating: stays.rating,
+      reviewCount: stays.reviewCount,
+      maxGuests: stays.maxGuests,
+      image: stays.image,
+      imageAlt: stays.imageAlt,
+      latitude: stays.latitude,
+      longitude: stays.longitude,
+      highlights: stays.highlights,
+      locationNote: stays.locationNote,
+      gettingThere: stays.gettingThere,
+      checkInTime: stays.checkInTime,
+      checkOutTime: stays.checkOutTime,
+      childrenNote: stays.childrenNote,
+      petsNote: stays.petsNote,
+      smokingNote: stays.smokingNote,
+      mealsNote: stays.mealsNote,
+      accessibilityNote: stays.accessibilityNote,
+      ratingCleanliness: stays.ratingCleanliness,
+      ratingLocation: stays.ratingLocation,
+      ratingService: stays.ratingService,
+      ratingExperience: stays.ratingExperience,
+      destinationSlug: destinations.slug,
+      destinationName: destinations.name,
+      destinationRegion: destinations.region,
+      destinationBlurb: destinations.blurb,
+    })
+    .from(stays)
+    .innerJoin(destinations, eq(destinations.id, stays.destinationId))
+    .where(eq(stays.slug, slug))
+    .limit(1);
+
+  if (!stay) return null;
+
+  const [gallery, amenityRows, optionRows, experienceRows] = await Promise.all([
+    db
+      .select({ url: stayImages.url, alt: stayImages.alt })
+      .from(stayImages)
+      .where(eq(stayImages.stayId, stay.id))
+      .orderBy(asc(stayImages.position)),
+    db
+      .select({ slug: amenities.slug, name: amenities.name })
+      .from(stayAmenities)
+      .innerJoin(amenities, eq(amenities.id, stayAmenities.amenityId))
+      .where(eq(stayAmenities.stayId, stay.id))
+      .orderBy(asc(amenities.id)),
+    db
+      .select({
+        id: accommodationOptions.id,
+        slug: accommodationOptions.slug,
+        name: accommodationOptions.name,
+        shortDescription: accommodationOptions.shortDescription,
+        guestCapacity: accommodationOptions.guestCapacity,
+        bedDescription: accommodationOptions.bedDescription,
+        priceFromUgx: accommodationOptions.priceFromUgx,
+        currency: accommodationOptions.currency,
+        sizeSqm: accommodationOptions.sizeSqm,
+        features: accommodationOptions.features,
+        image: accommodationOptions.image,
+        imageAlt: accommodationOptions.imageAlt,
+      })
+      .from(accommodationOptions)
+      .where(eq(accommodationOptions.stayId, stay.id))
+      .orderBy(asc(accommodationOptions.position), asc(accommodationOptions.id)),
+    db
+      .select({
+        slug: experiences.slug,
+        name: experiences.name,
+        shortDescription: experiences.shortDescription,
+        category: experiences.category,
+        duration: experiences.duration,
+        priceFromUgx: experiences.priceFromUgx,
+        image: experiences.image,
+        imageAlt: experiences.imageAlt,
+      })
+      .from(stayExperiences)
+      .innerJoin(experiences, eq(experiences.id, stayExperiences.experienceId))
+      .where(eq(stayExperiences.stayId, stay.id))
+      .orderBy(asc(stayExperiences.position)),
+  ]);
+
+  const breakdown: { label: string; value: number }[] = [];
+  const push = (label: string, raw: string | null) => {
+    if (raw !== null) breakdown.push({ label, value: Number(raw) });
+  };
+  push("Cleanliness", stay.ratingCleanliness);
+  push("Location", stay.ratingLocation);
+  push("Service", stay.ratingService);
+  push("Experience", stay.ratingExperience);
+
+  return {
+    id: stay.id,
+    slug: stay.slug,
+    name: stay.name,
+    stayType: stay.stayType,
+    shortDescription: stay.shortDescription,
+    description: stay.description,
+    priceFromUgx: stay.priceFromUgx,
+    currency: stay.currency,
+    rating: Number(stay.rating),
+    reviewCount: stay.reviewCount,
+    maxGuests: stay.maxGuests,
+    image: stay.image,
+    imageAlt: stay.imageAlt,
+    latitude: stay.latitude === null ? null : Number(stay.latitude),
+    longitude: stay.longitude === null ? null : Number(stay.longitude),
+    highlights: stay.highlights,
+    locationNote: stay.locationNote,
+    gettingThere: stay.gettingThere,
+    checkInTime: stay.checkInTime,
+    checkOutTime: stay.checkOutTime,
+    childrenNote: stay.childrenNote,
+    petsNote: stay.petsNote,
+    smokingNote: stay.smokingNote,
+    mealsNote: stay.mealsNote,
+    accessibilityNote: stay.accessibilityNote,
+    ratingBreakdown: breakdown,
+    destination: {
+      slug: stay.destinationSlug,
+      name: stay.destinationName,
+      region: stay.destinationRegion,
+      blurb: stay.destinationBlurb,
+    },
+    gallery,
+    amenities: amenityRows,
+    options: optionRows,
+    experiences: experienceRows,
+  };
+}
+
+/**
+ * Nearby stays: same destination first, then the same stay type elsewhere,
+ * always excluding the current property. Bounded by `limit`.
+ */
+export async function findRelatedStays(
+  stayId: number,
+  destinationSlug: string,
+  stayType: StayType,
+  limit = 3,
+): Promise<StayResult[]> {
+  const db = getDb();
+  const rows = await db
+    .select({
+      id: stays.id,
+      slug: stays.slug,
+      name: stays.name,
+      stayType: stays.stayType,
+      shortDescription: stays.shortDescription,
+      priceFromUgx: stays.priceFromUgx,
+      currency: stays.currency,
+      rating: stays.rating,
+      reviewCount: stays.reviewCount,
+      maxGuests: stays.maxGuests,
+      featured: stays.featured,
+      image: stays.image,
+      imageAlt: stays.imageAlt,
+      destinationSlug: destinations.slug,
+      destinationName: destinations.name,
+      sameDestination: sql<number>`case when ${destinations.slug} = ${destinationSlug} then 0 else 1 end`.mapWith(
+        Number,
+      ),
+    })
+    .from(stays)
+    .innerJoin(destinations, eq(destinations.id, stays.destinationId))
+    .where(
+      and(
+        ne(stays.id, stayId),
+        or(eq(destinations.slug, destinationSlug), eq(stays.stayType, stayType)),
+      ),
+    )
+    .orderBy(
+      asc(sql`case when ${destinations.slug} = ${destinationSlug} then 0 else 1 end`),
+      desc(stays.rating),
+      asc(stays.id),
+    )
+    .limit(limit);
+
+  return rows.map((r) => ({ ...r, rating: Number(r.rating), amenities: [] }));
+}
+
+/** Slugs for the sitemap-style checks and tests. */
+export async function listStaySlugs() {
+  const db = getDb();
+  return db.select({ slug: stays.slug }).from(stays).orderBy(asc(stays.id));
 }

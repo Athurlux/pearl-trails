@@ -4,6 +4,26 @@
 
 Lodges, campsites and experiences across Uganda — the Pearl of Africa.
 
+## Release 3 — Property Details
+
+Every stay now has a full property page at `/stays/[slug]`:
+
+- **Gallery** — hero plus a two-by-two block on desktop, a snap rail on mobile, and a
+  keyboard-navigable lightbox (arrows, Escape, focus return) written in-house rather than
+  pulled from a dependency.
+- **Overview, highlights, amenities** — amenities use one inline icon family, with the
+  overflow behind a `<details>` so it works without JavaScript.
+- **Ways to stay** — 1–3 accommodation options per property, varied by type. A campsite
+  offers a pitch and a ready tent; an escarpment lodge offers rooms and a suite.
+- **Experiences, location, good to know, guest ratings, related stays.**
+- **Trip planner** — dates, guests and accommodation held in the URL, with a live
+  estimated stay subtotal. Sticky sidebar on desktop, bottom bar on mobile.
+
+Trip context (`checkIn`, `checkOut`, `guests`, `option`) carries from Explore through the
+property page into `/book/[slug]`, which Release 4 will turn into the real booking flow.
+
+**No availability model exists yet.** Dates are trip planning only, and the UI says so.
+
 ## Release 2 — Explore Stays
 
 `/stays` is a database-backed discovery experience: search, filter, sort and page through

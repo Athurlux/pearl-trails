@@ -5,9 +5,9 @@ workflow live in `~/.claude/CLAUDE.md` and are **not** repeated here.
 
 ## Status
 
-**Release 2 shipped: Explore Stays, backed by Neon PostgreSQL, on Cloudflare Workers.**
+**Release 3 shipped: property detail pages on top of Explore Stays.**
 
-The catalogue lives in Postgres and is the single source of truth. There is still no
+The catalogue lives in Neon Postgres and is the single source of truth. There is still no
 auth, no availability, no booking and no payments. Do not add a queue, cache, search
 engine or background worker without a decision record in `docs/decisions/`.
 
@@ -69,7 +69,17 @@ server-side error while users only see the branded error page.
 | --- | --- | --- |
 | `/` | dynamic | reads the catalogue; states real counts |
 | `/stays` | dynamic | Explore; all state in the URL |
-| `/stays/[slug]` | dynamic | Release 2 shell, real data, no booking |
+| `/stays/[slug]` | dynamic | property detail: gallery, options, experiences |
+| `/book/[slug]` | dynamic | trip-context hand-off; `noindex`; flow lands in R4 |
+
+**Trip context** (`src/lib/trip-params.ts`) is a second, smaller URL contract carried from
+Explore into a property and on to `/book`: `checkIn`, `checkOut`, `guests`, `option`.
+Dates are compared as `YYYY-MM-DD` strings parsed in UTC so a browser in another timezone
+cannot shift a Ugandan check-in by a day. An `option` slug from the URL is only honoured
+after checking it belongs to the property being viewed.
+
+**There is still no availability model.** The planner says "estimated" and "nothing is
+reserved", and must keep saying so until real inventory exists.
 
 URL parameter names are a contract: `q`, `destination`, `type`, `amenity`, `minPrice`,
 `maxPrice`, `guests`, `minRating`, `sort`, `page`, `checkIn`, `checkOut`. Parsing and
@@ -80,7 +90,15 @@ a clamp, never by reading `searchParams` directly in a component.
 
 - `src/app/page.tsx` and `src/app/stays/page.tsx` stay **Server Components**.
 - Client islands are `Header`, `SearchBar`, `ExploreSearch`, `FilterControls`,
-  `SortSelect`, `SaveButton`, `Reveal`. Adding another needs a reason.
+  `SortSelect`, `SaveButton`, `Reveal`, `PropertyGallery`, `TripPlanner`, `ShareButton`.
+  Adding another needs a reason.
+- `Header` takes `variant="solid"` on routes whose content starts light. The default
+  overlay uses the reversed logo, which is invisible on ivory.
+- Galleries render **one DOM node per image**, reshaped by CSS. A separate mobile rail
+  and desktop grid looked identical but downloaded every photograph twice.
+- Release 3 tables: `stay_images`, `accommodation_options`, `experiences`,
+  `stay_experiences`, plus policy/highlight/rating columns on `stays`. Accommodation
+  options are descriptive products — there is no unit count and no availability.
 - Filter, sort and pagination state belongs in the **URL**, not React state. That is what
   makes searches shareable and the back button work.
 - All filtering happens in Postgres. Never fetch the catalogue and filter in the browser.

@@ -15,7 +15,12 @@ const navLinks = [
   { label: "About", href: "/#about" },
 ];
 
-export function Header() {
+/**
+ * `overlay` floats the header on a dark hero and uses the reversed logo.
+ * `solid` is for pages whose content starts light — the reversed logo would be
+ * invisible there, which is exactly what happened on the property page.
+ */
+export function Header({ variant = "overlay" }: { variant?: "overlay" | "solid" }) {
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
 
@@ -42,7 +47,7 @@ export function Header() {
     return () => window.removeEventListener("keydown", onKey);
   }, [open]);
 
-  const solid = scrolled || open;
+  const solid = variant === "solid" || scrolled || open;
 
   return (
     <header
