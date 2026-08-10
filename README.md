@@ -4,6 +4,87 @@
 
 Lodges, campsites and experiences across Uganda — the Pearl of Africa.
 
+**Pearl Trails MVP v1.0.** A traveller can discover a stay, request a booking, plan their
+trip and return to it. Staff can sign in, review what came in, respond to it, and change
+the catalogue — with every consequential action recorded.
+
+There is no payment layer, and the product never implies one. See
+[Payments](#payments--deliberately-not-built).
+
+## Release 7 — Operations Console
+
+The internal tool that makes the product operable, at `/ops`.
+
+```
+Staff sign in
+      ↓
+Overview        requests waiting · arrivals in 7 days · recent activity
+      ↓
+Bookings        search, filter, page — all in Postgres, all in the URL
+      ↓
+Booking         traveller, stay, experiences, estimate, internal notes, history
+      ↓
+Act             confirm · cancel · expire — only the legal moves are offered
+```
+
+### Authentication
+
+Staff sign in with an email and password. Sessions are a random 260-bit token in an
+`HttpOnly`, `SameSite=Lax`, `Secure` cookie; only a hash of it is stored, and expiry is
+enforced in the query rather than in application code. Passwords are PBKDF2-HMAC-SHA256
+with a per-password salt.
+
+Accounts are created interactively — there is no seeded default account, because a
+committed default credential is a public one:
+
+```bash
+npm run staff:create
+```
+
+Failed sign-ins are throttled per account rather than per IP: an IP key is defeated by
+rotating addresses and punishes shared connections, which in Uganda is the common case.
+
+`docs/decisions/006-staff-authentication.md` records why this is purpose-built rather
+than a library, and — importantly — states plainly that **Cloudflare Workers caps PBKDF2
+at 100,000 iterations**, which is below current OWASP guidance. That is the weakest part
+of the release, and moving to Argon2id via a maintained library is the upgrade path.
+
+### Authorisation
+
+Every `/ops` page and every operations action begins with `requireStaff()`, which returns
+the signed-in staff member or redirects. It is not middleware: middleware protects a URL
+pattern, so a new route that is not in the pattern is public. Here the protected thing
+carries its own protection.
+
+Two roles. `operations` reads everything and acts on bookings. `admin` additionally
+changes prices, inventory and visibility.
+
+### What is protected
+
+- **Payment state cannot be fabricated** — there is no payment state to fabricate.
+- **Only legal status transitions are possible.** The current status is in the `WHERE`
+  clause of the update, so two staff acting at once cannot both succeed or both write an
+  audit row for one change.
+- **Cancelling releases the dates**, because the terminal statuses sit outside the
+  blocking set that the availability query and the exclusion constraint both use.
+- **Changing a price never rewrites history.** Bookings snapshot what they were quoted.
+- **Internal notes never reach the traveller**, on any page.
+- **Audit rows snapshot who acted**, so removing an account does not turn the trail into
+  "someone".
+
+### Property visibility
+
+`draft`, `published` or `archived`. Unpublishing removes a property from search, the
+landing page, the sitemap and its own URL — enforced by one `PUBLISHED` constant applied
+to every query in `stays-query.ts`. `visibility.test.ts` checks each public entry point
+individually, because the leak that matters is a forgotten filter on a single-slug lookup,
+not on the listing everybody looks at.
+
+### New database objects
+
+`staff_users`, `staff_sessions`, `staff_login_attempts`, `audit_events`, `booking_notes`,
+plus `visibility` on `stays`. Migration `0004_woozy_darkstar.sql`.
+
 ## Release 5 — My Trip & Itinerary
 
 A booking becomes a trip. Every reservation has a private page laying out the stay day by

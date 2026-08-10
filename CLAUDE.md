@@ -5,13 +5,16 @@ workflow live in `~/.claude/CLAUDE.md` and are **not** repeated here.
 
 ## Status
 
-**Release 5 shipped: My Trip — a day-by-day itinerary built from a real booking.**
+**Release 7 shipped: the operations console. This is MVP v1.0.**
 
 The catalogue lives in Neon Postgres and is the single source of truth. A traveller can
 request a booking end to end, gets a persisted reference back, and can open a private
-trip page to plan their days. There is still no auth, no payment, no notification and no
-operator tooling. Do not add a queue, cache, search engine or background worker without
-a decision record in `docs/decisions/`.
+trip page to plan their days. Staff sign in at `/ops`, review requests, move bookings
+between statuses, leave internal notes, and publish or unpublish properties — with every
+consequential action recorded in `audit_events`.
+
+There is no payment and no notification delivery. Do not add a queue, cache, search
+engine or background worker without a decision record in `docs/decisions/`.
 
 **Payments are deliberately not built.** Release 6 was scoped and then deferred by the
 product owner: there is no merchant account, and a payment layer that cannot take a real
@@ -58,6 +61,7 @@ npm run db:generate   # write a migration from schema changes
 npm run db:migrate    # apply pending migrations
 npm run db:seed       # idempotent — safe to re-run, never runs automatically
 npm run db:studio     # inspect the data
+npm run staff:create  # interactive — create or reset an operations account
 ```
 
 `DATABASE_URL` lives in `.env.local` for development and as a **Worker secret** in
@@ -80,6 +84,7 @@ server-side error while users only see the branded error page.
 | `/book/[slug]` | dynamic | the booking flow; `noindex` |
 | `/booking/[reference]` | dynamic | confirmation; `noindex`, no social metadata |
 | `/trip/[token]` | dynamic | My Trip; `noindex`, `no-referrer`, no social metadata |
+| `/ops/*` | dynamic | internal; every page calls `requireStaff()`; `noindex` |
 
 **Trip context** (`src/lib/trip-params.ts`) is a second, smaller URL contract carried from
 Explore into a property and on into `/book`: `checkIn`, `checkOut`, `guests`, `option`,
@@ -178,6 +183,36 @@ URL parameter names are a contract: `q`, `destination`, `type`, `amenity`, `minP
 `maxPrice`, `guests`, `minRating`, `sort`, `page`, `checkIn`, `checkOut`. Parsing and
 validation live in `src/lib/stays-params.ts` — add new params there, with a whitelist or
 a clamp, never by reading `searchParams` directly in a component.
+
+## Operations (Release 7)
+
+Read `docs/decisions/006` before changing any of this.
+
+- **`requireStaff()` is the gate, and it lives in the page and in the action** — never in
+  `layout.tsx` and never in middleware. Middleware protects a URL *pattern*, so the day
+  someone adds `/ops/reports` and forgets the pattern, the page is public. The layout
+  reads the session only to decide whether to draw a nav bar.
+- **PBKDF2 is capped at 100,000 iterations by the Workers runtime.** Above it,
+  `deriveBits` throws `NotSupportedError`. This was set to OWASP's 210,000, passed every
+  local test because Node has no cap, and failed only in production — where a `catch`
+  turned the throw into "wrong password" and locked out a correct credential silently.
+  Do not raise it, and do not wrap the derivation in a `catch` again.
+- **Only the legal transitions are offered, and the current status is in the `WHERE`
+  clause** of the update. That is the optimistic lock: two staff acting at once cannot
+  both succeed, and cannot both write an audit row for one change.
+- **Cancelling releases inventory automatically** — `cancelled` and `expired` sit outside
+  `BLOCKING_BOOKING_STATUSES`, so the availability query and the exclusion constraint both
+  stop counting the row. There is no inventory bookkeeping to do.
+- **`stays.visibility` gates the public catalogue** through one `PUBLISHED` constant in
+  `stays-query.ts`, applied to every query there including single-slug lookups and the
+  sitemap. `ops-query.ts` deliberately does not apply it. `visibility.test.ts` checks each
+  public entry point, because the failure that matters is a forgotten filter on a lookup,
+  not on the listing.
+- **Audit rows snapshot the actor's name and email** and reference targets by their public
+  identifier. A trail that resolves to "someone" after an account is removed is not a
+  trail.
+- Staff accounts are created with `npm run staff:create`, interactively. There is no
+  seeded default account, because a committed default credential is a public one.
 
 ## Architecture rules
 
@@ -294,11 +329,16 @@ vanishes — including from production, which is the same Neon branch. Demo book
 scripts belong in `tmp/`, which is ignored by git, eslint and tsc.
 
 **Each DB test file needs its own marker.** `booking.test.ts` owns
-`@booking-test.invalid` and `trip.test.ts` owns `@trip-test.invalid`. Vitest runs files
-in parallel, so when they shared one, each file's `beforeAll` cleanup deleted the other's
-rows mid-run: booking assertions watched a sold-out unit become available, and trip
-assertions hit foreign-key failures against bookings removed underneath them. Both suites
-were correct; their isolation was not. A new DB suite takes a new marker.
+`@booking-test.invalid`, `trip.test.ts` owns `@trip-test.invalid`, `ops.test.ts` owns
+`@ops-test.invalid`. When two shared one, each file's cleanup deleted the other's rows
+mid-run. A new DB suite takes a new marker.
+
+**`fileParallelism` is off**, and that is load-bearing rather than a performance tweak.
+Markers keep *rows* apart but cannot keep global state apart: `visibility.test.ts`
+unpublishes a property for the length of its suite while `queries.test.ts` asserts the
+catalogue holds 22, so the count came back 21 and the failure looked like a broken query.
+Restore parallelism only alongside a per-worker database branch — never by making the
+assertions vaguer.
 
 <!-- BEGIN:nextjs-agent-rules -->
 

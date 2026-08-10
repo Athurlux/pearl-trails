@@ -1,5 +1,6 @@
 import "server-only";
 import { and, asc, desc, eq, gte, ilike, inArray, lte, ne, or, sql } from "drizzle-orm";
+import type { SQL } from "drizzle-orm";
 import { getDb } from "@/db";
 import {
   accommodationOptions,
@@ -55,8 +56,24 @@ const searchVector = sql`(
   setweight(to_tsvector('english', ${stays.description}), 'D')
 )`;
 
+/**
+ * The public catalogue is published properties only.
+ *
+ * Applied to **every** query in this module, including single-property lookups
+ * and the sitemap — a draft property must not be reachable by typing its slug,
+ * and an archived one must stop being offered without its bookings breaking.
+ *
+ * Deliberately a shared constant rather than a habit: a new query that forgets
+ * it is a leak, and having one name to grep for is what makes that reviewable.
+ * Operations reads the catalogue through `ops-query.ts`, which does not apply
+ * it, because staff are the people who need to see a draft.
+ */
+const PUBLISHED = eq(stays.visibility, "published");
+
 function buildWhere(p: StaysParams) {
-  const clauses = [];
+  // Typed explicitly: seeding the array with `PUBLISHED` would otherwise narrow
+  // it to `SQL<unknown>[]`, and `or(...)` can return undefined.
+  const clauses: (SQL<unknown> | undefined)[] = [PUBLISHED];
 
   if (p.destination) clauses.push(eq(destinations.slug, p.destination));
   if (p.types.length) clauses.push(inArray(stays.stayType, p.types));
@@ -230,7 +247,10 @@ export async function listDestinationsWithCounts() {
       stayCount: sql<number>`count(${stays.id})`.mapWith(Number),
     })
     .from(destinations)
-    .leftJoin(stays, eq(stays.destinationId, destinations.id))
+    // The visibility filter belongs in the JOIN, not a WHERE. In a WHERE it
+    // would run after the outer join and discard destinations whose stays are
+    // all drafts — turning "Kidepo, 0 stays" into no Kidepo tile at all.
+    .leftJoin(stays, and(eq(stays.destinationId, destinations.id), PUBLISHED))
     .groupBy(destinations.id)
     .orderBy(desc(sql`count(${stays.id})`), asc(destinations.name));
 }
@@ -258,6 +278,7 @@ export async function listFeaturedStays(limit = 6): Promise<StayResult[]> {
     })
     .from(stays)
     .innerJoin(destinations, eq(destinations.id, stays.destinationId))
+    .where(PUBLISHED)
     .orderBy(desc(stays.featured), desc(stays.rating), asc(stays.id))
     .limit(limit);
 
@@ -295,6 +316,7 @@ export async function countStaysByType(): Promise<Record<StayType, number>> {
   const rows = await db
     .select({ stayType: stays.stayType, count: sql<number>`count(*)`.mapWith(Number) })
     .from(stays)
+    .where(PUBLISHED)
     .groupBy(stays.stayType);
 
   const counts = Object.fromEntries(
@@ -333,7 +355,7 @@ export async function findStayBySlug(slug: string) {
     })
     .from(stays)
     .innerJoin(destinations, eq(destinations.id, stays.destinationId))
-    .where(eq(stays.slug, slug))
+    .where(and(eq(stays.slug, slug), PUBLISHED))
     .limit(1);
 
   if (!row) return null;
@@ -446,7 +468,7 @@ export async function getPropertyDetail(slug: string): Promise<PropertyDetail | 
     })
     .from(stays)
     .innerJoin(destinations, eq(destinations.id, stays.destinationId))
-    .where(eq(stays.slug, slug))
+    .where(and(eq(stays.slug, slug), PUBLISHED))
     .limit(1);
 
   if (!stay) return null;
@@ -584,6 +606,7 @@ export async function findRelatedStays(
     .innerJoin(destinations, eq(destinations.id, stays.destinationId))
     .where(
       and(
+        PUBLISHED,
         ne(stays.id, stayId),
         or(eq(destinations.slug, destinationSlug), eq(stays.stayType, stayType)),
       ),
@@ -601,5 +624,9 @@ export async function findRelatedStays(
 /** Slugs for the sitemap-style checks and tests. */
 export async function listStaySlugs() {
   const db = getDb();
-  return db.select({ slug: stays.slug }).from(stays).orderBy(asc(stays.id));
+  return db
+    .select({ slug: stays.slug })
+    .from(stays)
+    .where(PUBLISHED)
+    .orderBy(asc(stays.id));
 }

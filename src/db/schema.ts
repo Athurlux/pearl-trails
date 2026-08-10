@@ -27,6 +27,12 @@ import {
   MAX_TRIP_NOTE,
   TIME_OF_DAY,
 } from "@/lib/itinerary-vocab";
+import {
+  AUDIT_ACTIONS,
+  MAX_STAFF_NOTE,
+  STAFF_ROLES,
+  STAY_VISIBILITIES,
+} from "@/lib/staff-vocab";
 import { STAY_TYPES } from "@/lib/stay-types";
 
 /**
@@ -45,6 +51,9 @@ export const itinerarySystemKindEnum = pgEnum(
   ITINERARY_SYSTEM_KINDS,
 );
 export const timeOfDayEnum = pgEnum("time_of_day", TIME_OF_DAY);
+export const staffRoleEnum = pgEnum("staff_role", STAFF_ROLES);
+export const stayVisibilityEnum = pgEnum("stay_visibility", STAY_VISIBILITIES);
+export const auditActionEnum = pgEnum("audit_action", AUDIT_ACTIONS);
 
 export const destinations = pgTable(
   "destinations",
@@ -128,11 +137,20 @@ export const stays = pgTable(
     ratingService: numeric("rating_service", { precision: 2, scale: 1 }),
     ratingExperience: numeric("rating_experience", { precision: 2, scale: 1 }),
 
+    /**
+     * Release 7. Defaults to `published` so the 22 properties already live stay
+     * live through the migration — a default of `draft` would empty Explore.
+     * Archived rather than deleted: bookings reference stays with
+     * `ON DELETE RESTRICT`, and history has to survive a property being retired.
+     */
+    visibility: stayVisibilityEnum("visibility").notNull().default("published"),
+
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
     uniqueIndex("stays_slug_key").on(t.slug),
+    index("stays_visibility_idx").on(t.visibility),
     // Indexes follow the actual Explore query: filter by destination and type,
     // order by price. Nothing is indexed speculatively.
     index("stays_destination_id_idx").on(t.destinationId),
@@ -527,6 +545,162 @@ export const itineraryItems = pgTable(
   ],
 );
 
+/**
+ * Internal staff. There is no self-registration and no traveller here — this
+ * table is reachable only from `/ops`, and travellers still have no accounts.
+ */
+export const staffUsers = pgTable(
+  "staff_users",
+  {
+    id: serial("id").primaryKey(),
+    /** Stored lower-cased; the unique index is what makes that a guarantee. */
+    email: varchar("email", { length: 254 }).notNull(),
+    name: varchar("name", { length: 120 }).notNull(),
+    role: staffRoleEnum("role").notNull().default("operations"),
+
+    /**
+     * `pbkdf2$sha256$<iterations>$<salt>$<hash>`. The iteration count travels
+     * with the hash so it can be raised later without invalidating anyone.
+     */
+    passwordHash: text("password_hash").notNull(),
+
+    /** Revocation without deletion — audit rows point at this row by id. */
+    isActive: boolean("is_active").notNull().default(true),
+    lastSignedInAt: timestamp("last_signed_in_at", { withTimezone: true }),
+
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("staff_users_email_key").on(t.email),
+    check("staff_users_email_lowercase", sql`${t.email} = lower(${t.email})`),
+  ],
+);
+
+/**
+ * A signed-in session.
+ *
+ * Only a hash of the token is stored, as with trip tokens (decision 004): read
+ * access to this table is not a way in. Expiry is compared in the `WHERE`
+ * clause of the lookup rather than in application code, so an expired session
+ * cannot be resurrected by a bug in a date comparison.
+ */
+export const staffSessions = pgTable(
+  "staff_sessions",
+  {
+    id: serial("id").primaryKey(),
+    tokenHash: varchar("token_hash", { length: 64 }).notNull(),
+    staffUserId: integer("staff_user_id")
+      .notNull()
+      .references(() => staffUsers.id, { onDelete: "cascade" }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("staff_sessions_token_hash_key").on(t.tokenHash),
+    index("staff_sessions_expires_at_idx").on(t.expiresAt),
+  ],
+);
+
+/**
+ * Failed sign-ins, for throttling.
+ *
+ * Keyed on the account rather than the IP. An IP key is defeated by rotating
+ * addresses and punishes shared connections, which in Uganda is the common
+ * case rather than the edge case.
+ */
+export const staffLoginAttempts = pgTable(
+  "staff_login_attempts",
+  {
+    id: serial("id").primaryKey(),
+    email: varchar("email", { length: 254 }).notNull(),
+    attemptedAt: timestamp("attempted_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("staff_login_attempts_email_time_idx").on(t.email, t.attemptedAt)],
+);
+
+/**
+ * Who did what.
+ *
+ * Append-only by convention and by the absence of any update or delete path —
+ * nothing in the application writes to this table except `recordAudit`.
+ *
+ * The actor's email and name are **snapshots**. A staff member can be
+ * deactivated or removed; what they did must remain readable, and a dangling
+ * foreign key would leave an audit trail that says "someone".
+ *
+ * Targets are referenced by their public identifier — a booking reference, a
+ * stay slug — never an internal id, so the log is legible without joining and
+ * exposes nothing a URL does not already.
+ */
+export const auditEvents = pgTable(
+  "audit_events",
+  {
+    id: serial("id").primaryKey(),
+    action: auditActionEnum("action").notNull(),
+
+    actorStaffId: integer("actor_staff_id").references(() => staffUsers.id, {
+      onDelete: "set null",
+    }),
+    actorEmail: varchar("actor_email", { length: 254 }).notNull(),
+    actorName: varchar("actor_name", { length: 120 }).notNull(),
+
+    targetType: varchar("target_type", { length: 32 }).notNull(),
+    targetRef: varchar("target_ref", { length: 96 }).notNull(),
+
+    /** One sentence, already written for a human. Never a secret. */
+    summary: varchar("summary", { length: 240 }).notNull(),
+
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("audit_events_created_at_idx").on(t.createdAt),
+    index("audit_events_target_idx").on(t.targetType, t.targetRef),
+  ],
+);
+
+/**
+ * An internal note on a booking.
+ *
+ * Never shown to the traveller — not on the confirmation page, not on the trip
+ * page. The author's name is snapshotted for the same reason as in
+ * `audit_events`.
+ */
+export const bookingNotes = pgTable(
+  "booking_notes",
+  {
+    id: serial("id").primaryKey(),
+    bookingId: integer("booking_id")
+      .notNull()
+      .references(() => bookings.id, { onDelete: "cascade" }),
+    authorStaffId: integer("author_staff_id").references(() => staffUsers.id, {
+      onDelete: "set null",
+    }),
+    authorName: varchar("author_name", { length: 120 }).notNull(),
+    body: varchar("body", { length: MAX_STAFF_NOTE }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("booking_notes_booking_id_idx").on(t.bookingId, t.createdAt),
+    check("booking_notes_body_not_blank", sql`length(btrim(${t.body})) > 0`),
+  ],
+);
+
+export const staffUsersRelations = relations(staffUsers, ({ many }) => ({
+  sessions: many(staffSessions),
+}));
+
+export const staffSessionsRelations = relations(staffSessions, ({ one }) => ({
+  user: one(staffUsers, {
+    fields: [staffSessions.staffUserId],
+    references: [staffUsers.id],
+  }),
+}));
+
+export const bookingNotesRelations = relations(bookingNotes, ({ one }) => ({
+  booking: one(bookings, { fields: [bookingNotes.bookingId], references: [bookings.id] }),
+}));
+
 export const itineraryItemsRelations = relations(itineraryItems, ({ one }) => ({
   booking: one(bookings, {
     fields: [itineraryItems.bookingId],
@@ -623,5 +797,8 @@ export type ExperienceRow = typeof experiences.$inferSelect;
 export type BookingRow = typeof bookings.$inferSelect;
 export type BookingExperienceRow = typeof bookingExperiences.$inferSelect;
 export type ItineraryItemRow = typeof itineraryItems.$inferSelect;
+export type StaffUserRow = typeof staffUsers.$inferSelect;
+export type AuditEventRow = typeof auditEvents.$inferSelect;
+export type BookingNoteRow = typeof bookingNotes.$inferSelect;
 export type { StayType } from "@/lib/stay-types";
 export type { BookingStatus } from "@/lib/booking-status";
