@@ -64,7 +64,16 @@ export interface AccommodationSeed {
   slug: string;
   name: string;
   shortDescription: string;
+  /** How many people one unit sleeps. */
   guestCapacity: number;
+  /**
+   * How many equivalent units the property has (Release 4).
+   *
+   * Scarcity is part of the fiction and varies by property type: a signature
+   * suite is 1–3, a standard lodge room 5–10, a camping pitch 12–16. Uniform
+   * counts would make the availability model impossible to demonstrate.
+   */
+  inventory: number;
   bedDescription: string;
   priceFromUgx: number;
   sizeSqm?: number;
@@ -132,9 +141,9 @@ export const stayDetails: Record<string, StayDetailSeed> = {
     accessibilityNote: "The site is built on a slope with steps between levels. One ground-floor room avoids the main stairs.",
     ratings: { cleanliness: "4.9", location: "5.0", service: "4.8", experience: "4.9" },
     options: [
-      { slug: "forest-suite", name: "Forest Suite", shortDescription: "Corner room with glass on two sides and a private veranda over the canopy.", guestCapacity: 2, bedDescription: "1 king bed", priceFromUgx: 1120000, sizeSqm: 42, features: ["Private veranda", "Forest view", "Wood stove", "Breakfast included"], image: LODGE_BED, imageAlt: LODGE_BED_ALT },
-      { slug: "canopy-room", name: "Canopy Room", shortDescription: "The original rooms along the upper walkway, quieter and closer to the trees.", guestCapacity: 2, bedDescription: "1 queen bed", priceFromUgx: 920000, sizeSqm: 30, features: ["Forest view", "Private bathroom", "Breakfast included"], image: ROOM_INT, imageAlt: ROOM_INT_ALT },
-      { slug: "family-cottage", name: "Family Cottage", shortDescription: "Two connected rooms with a shared sitting area, set slightly apart from the main lodge.", guestCapacity: 4, bedDescription: "1 king bed and 2 singles", priceFromUgx: 1480000, sizeSqm: 58, features: ["Two bedrooms", "Sitting room", "Family friendly", "Breakfast included"], image: CABIN, imageAlt: CABIN_ALT },
+      { slug: "forest-suite", name: "Forest Suite", shortDescription: "Corner room with glass on two sides and a private veranda over the canopy.", guestCapacity: 2, inventory: 3, bedDescription: "1 king bed", priceFromUgx: 1120000, sizeSqm: 42, features: ["Private veranda", "Forest view", "Wood stove", "Breakfast included"], image: LODGE_BED, imageAlt: LODGE_BED_ALT },
+      { slug: "canopy-room", name: "Canopy Room", shortDescription: "The original rooms along the upper walkway, quieter and closer to the trees.", guestCapacity: 2, inventory: 8, bedDescription: "1 queen bed", priceFromUgx: 920000, sizeSqm: 30, features: ["Forest view", "Private bathroom", "Breakfast included"], image: ROOM_INT, imageAlt: ROOM_INT_ALT },
+      { slug: "family-cottage", name: "Family Cottage", shortDescription: "Two connected rooms with a shared sitting area, set slightly apart from the main lodge.", guestCapacity: 4, inventory: 2, bedDescription: "1 king bed and 2 singles", priceFromUgx: 1480000, sizeSqm: 58, features: ["Two bedrooms", "Sitting room", "Family friendly", "Breakfast included"], image: CABIN, imageAlt: CABIN_ALT },
     ],
   },
   "mubwindi-treetop-cabins": {
@@ -152,8 +161,8 @@ export const stayDetails: Record<string, StayDetailSeed> = {
     accessibilityNote: "Reached by raised boardwalk and steps only. Not suitable for wheelchair users.",
     ratings: { cleanliness: "4.7", location: "4.9", service: "4.6", experience: "4.8" },
     options: [
-      { slug: "treetop-cabin", name: "Treetop Cabin", shortDescription: "A single cabin on its own platform, glass on the forest side from floor to ceiling.", guestCapacity: 2, bedDescription: "1 double bed", priceFromUgx: 640000, sizeSqm: 24, features: ["Forest view", "Private bathroom", "Boardwalk access"], image: ROOM_INT, imageAlt: ROOM_INT_ALT },
-      { slug: "birders-cabin", name: "Birders Cabin", shortDescription: "The furthest cabin along the walkway, facing the swamp where the turacos come through at dawn.", guestCapacity: 2, bedDescription: "2 single beds", priceFromUgx: 700000, sizeSqm: 24, features: ["Swamp outlook", "Early breakfast", "Guided activities"], image: LODGE_BED, imageAlt: LODGE_BED_ALT },
+      { slug: "treetop-cabin", name: "Treetop Cabin", shortDescription: "A single cabin on its own platform, glass on the forest side from floor to ceiling.", guestCapacity: 2, inventory: 5, bedDescription: "1 double bed", priceFromUgx: 640000, sizeSqm: 24, features: ["Forest view", "Private bathroom", "Boardwalk access"], image: ROOM_INT, imageAlt: ROOM_INT_ALT },
+      { slug: "birders-cabin", name: "Birders Cabin", shortDescription: "The furthest cabin along the walkway, facing the swamp where the turacos come through at dawn.", guestCapacity: 2, inventory: 2, bedDescription: "2 single beds", priceFromUgx: 700000, sizeSqm: 24, features: ["Swamp outlook", "Early breakfast", "Guided activities"], image: LODGE_BED, imageAlt: LODGE_BED_ALT },
     ],
   },
   "ruhija-ridge-camp": {
@@ -171,7 +180,7 @@ export const stayDetails: Record<string, StayDetailSeed> = {
     accessibilityNote: "Uneven ground and a short climb from the parking area. Shared bathrooms are a short walk from the tents.",
     ratings: { cleanliness: "4.5", location: "4.8", service: "4.6", experience: "4.7" },
     options: [
-      { slug: "ridge-tent", name: "Ridge Tent", shortDescription: "Walk-in canvas with a proper bed, a writing desk and a bucket shower filled on request.", guestCapacity: 2, bedDescription: "1 double bed", priceFromUgx: 380000, features: ["Forest view", "Campfire", "Bucket shower"], image: TENT_INT, imageAlt: TENT_INT_ALT },
+      { slug: "ridge-tent", name: "Ridge Tent", shortDescription: "Walk-in canvas with a proper bed, a writing desk and a bucket shower filled on request.", guestCapacity: 2, inventory: 6, bedDescription: "1 double bed", priceFromUgx: 380000, features: ["Forest view", "Campfire", "Bucket shower"], image: TENT_INT, imageAlt: TENT_INT_ALT },
     ],
   },
 
@@ -191,8 +200,8 @@ export const stayDetails: Record<string, StayDetailSeed> = {
     accessibilityNote: "Level paths between the tents and the terrace, with a short ramp to the dining area.",
     ratings: { cleanliness: "4.8", location: "4.9", service: "4.8", experience: "4.9" },
     options: [
-      { slug: "river-tent", name: "River Tent", shortDescription: "Canvas on a raised deck facing the water, with the terrace a few steps away.", guestCapacity: 2, bedDescription: "1 king bed", priceFromUgx: 780000, sizeSqm: 36, features: ["River view", "Private deck", "Private bathroom", "Breakfast included"], image: CANVAS, imageAlt: CANVAS_ALT },
-      { slug: "family-tent", name: "Family Tent", shortDescription: "A larger tent set back from the bank with a partitioned second sleeping area.", guestCapacity: 4, bedDescription: "1 king bed and 2 singles", priceFromUgx: 1180000, sizeSqm: 52, features: ["Family friendly", "Private bathroom", "Breakfast included"], image: TENT_INT, imageAlt: TENT_INT_ALT },
+      { slug: "river-tent", name: "River Tent", shortDescription: "Canvas on a raised deck facing the water, with the terrace a few steps away.", guestCapacity: 2, inventory: 7, bedDescription: "1 king bed", priceFromUgx: 780000, sizeSqm: 36, features: ["River view", "Private deck", "Private bathroom", "Breakfast included"], image: CANVAS, imageAlt: CANVAS_ALT },
+      { slug: "family-tent", name: "Family Tent", shortDescription: "A larger tent set back from the bank with a partitioned second sleeping area.", guestCapacity: 4, inventory: 2, bedDescription: "1 king bed and 2 singles", priceFromUgx: 1180000, sizeSqm: 52, features: ["Family friendly", "Private bathroom", "Breakfast included"], image: TENT_INT, imageAlt: TENT_INT_ALT },
     ],
   },
   "victoria-nile-camp": {
@@ -210,8 +219,8 @@ export const stayDetails: Record<string, StayDetailSeed> = {
     accessibilityNote: "Grass pitches and shared ablutions. The ground is flat but soft after rain.",
     ratings: { cleanliness: "4.2", location: "4.6", service: "4.4", experience: "4.5" },
     options: [
-      { slug: "own-tent-pitch", name: "Own Tent Pitch", shortDescription: "A marked grass pitch on the terrace above the river with power at the kitchen.", guestCapacity: 3, bedDescription: "Bring your own", priceFromUgx: 150000, features: ["Campfire", "Shared kitchen", "Parking", "Family friendly"], image: DOME, imageAlt: DOME_ALT },
-      { slug: "ready-tent", name: "Ready Tent", shortDescription: "A pitched dome tent with mattresses and bedding already in place.", guestCapacity: 2, bedDescription: "2 mattresses with bedding", priceFromUgx: 260000, features: ["Bedding provided", "Campfire", "Shared kitchen"], image: DOME, imageAlt: DOME_ALT },
+      { slug: "own-tent-pitch", name: "Own Tent Pitch", shortDescription: "A marked grass pitch on the terrace above the river with power at the kitchen.", guestCapacity: 3, inventory: 14, bedDescription: "Bring your own", priceFromUgx: 150000, features: ["Campfire", "Shared kitchen", "Parking", "Family friendly"], image: DOME, imageAlt: DOME_ALT },
+      { slug: "ready-tent", name: "Ready Tent", shortDescription: "A pitched dome tent with mattresses and bedding already in place.", guestCapacity: 2, inventory: 6, bedDescription: "2 mattresses with bedding", priceFromUgx: 260000, features: ["Bedding provided", "Campfire", "Shared kitchen"], image: DOME, imageAlt: DOME_ALT },
     ],
   },
   "paraa-escarpment-lodge": {
@@ -229,9 +238,9 @@ export const stayDetails: Record<string, StayDetailSeed> = {
     accessibilityNote: "Level access from the car park to reception, dining and the pool. Two rooms are step-free.",
     ratings: { cleanliness: "4.9", location: "4.9", service: "4.9", experience: "4.8" },
     options: [
-      { slug: "escarpment-room", name: "Escarpment Room", shortDescription: "West-facing room along the ridge with a private balcony over the delta.", guestCapacity: 2, bedDescription: "1 king bed", priceFromUgx: 1150000, sizeSqm: 38, features: ["River view", "Balcony", "Air conditioning", "Breakfast included"], image: LODGE_BED, imageAlt: LODGE_BED_ALT },
-      { slug: "delta-suite", name: "Delta Suite", shortDescription: "The two end suites, with a separate sitting room and an outdoor bath on the terrace.", guestCapacity: 2, bedDescription: "1 king bed", priceFromUgx: 1680000, sizeSqm: 64, features: ["Outdoor bath", "Sitting room", "River view", "Breakfast included"], image: BATH, imageAlt: BATH_ALT },
-      { slug: "family-room", name: "Family Room", shortDescription: "Interconnecting rooms sharing a balcony, set at the quieter end of the ridge.", guestCapacity: 4, bedDescription: "1 king bed and 2 singles", priceFromUgx: 1720000, sizeSqm: 60, features: ["Family friendly", "Balcony", "Pool access", "Breakfast included"], image: ROOM_INT, imageAlt: ROOM_INT_ALT },
+      { slug: "escarpment-room", name: "Escarpment Room", shortDescription: "West-facing room along the ridge with a private balcony over the delta.", guestCapacity: 2, inventory: 9, bedDescription: "1 king bed", priceFromUgx: 1150000, sizeSqm: 38, features: ["River view", "Balcony", "Air conditioning", "Breakfast included"], image: LODGE_BED, imageAlt: LODGE_BED_ALT },
+      { slug: "delta-suite", name: "Delta Suite", shortDescription: "The two end suites, with a separate sitting room and an outdoor bath on the terrace.", guestCapacity: 2, inventory: 2, bedDescription: "1 king bed", priceFromUgx: 1680000, sizeSqm: 64, features: ["Outdoor bath", "Sitting room", "River view", "Breakfast included"], image: BATH, imageAlt: BATH_ALT },
+      { slug: "family-room", name: "Family Room", shortDescription: "Interconnecting rooms sharing a balcony, set at the quieter end of the ridge.", guestCapacity: 4, inventory: 3, bedDescription: "1 king bed and 2 singles", priceFromUgx: 1720000, sizeSqm: 60, features: ["Family friendly", "Balcony", "Pool access", "Breakfast included"], image: ROOM_INT, imageAlt: ROOM_INT_ALT },
     ],
   },
 
@@ -251,8 +260,8 @@ export const stayDetails: Record<string, StayDetailSeed> = {
     accessibilityNote: "The lounge and dining area are step-free. Rooms are reached by a short gravel path.",
     ratings: { cleanliness: "4.7", location: "4.8", service: "4.7", experience: "4.7" },
     options: [
-      { slug: "channel-room", name: "Channel Room", shortDescription: "Paired rooms behind the lounge, each with a shaded veranda facing the water.", guestCapacity: 2, bedDescription: "1 queen bed", priceFromUgx: 870000, sizeSqm: 32, features: ["Veranda", "Private bathroom", "Breakfast included"], image: ROOM_INT, imageAlt: ROOM_INT_ALT },
-      { slug: "savanna-suite", name: "Savanna Suite", shortDescription: "A larger corner suite with its own sitting area and a wider outlook over the plain.", guestCapacity: 3, bedDescription: "1 king bed and 1 single", priceFromUgx: 1240000, sizeSqm: 48, features: ["Sitting area", "Plains view", "Breakfast included"], image: LODGE_BED, imageAlt: LODGE_BED_ALT },
+      { slug: "channel-room", name: "Channel Room", shortDescription: "Paired rooms behind the lounge, each with a shaded veranda facing the water.", guestCapacity: 2, inventory: 10, bedDescription: "1 queen bed", priceFromUgx: 870000, sizeSqm: 32, features: ["Veranda", "Private bathroom", "Breakfast included"], image: ROOM_INT, imageAlt: ROOM_INT_ALT },
+      { slug: "savanna-suite", name: "Savanna Suite", shortDescription: "A larger corner suite with its own sitting area and a wider outlook over the plain.", guestCapacity: 3, inventory: 3, bedDescription: "1 king bed and 1 single", priceFromUgx: 1240000, sizeSqm: 48, features: ["Sitting area", "Plains view", "Breakfast included"], image: LODGE_BED, imageAlt: LODGE_BED_ALT },
     ],
   },
   "kyambura-gorge-retreat": {
@@ -270,8 +279,8 @@ export const stayDetails: Record<string, StayDetailSeed> = {
     accessibilityNote: "Stone paths with occasional steps between the terrace and the rooms.",
     ratings: { cleanliness: "4.9", location: "4.9", service: "4.9", experience: "5.0" },
     options: [
-      { slug: "gorge-room", name: "Gorge Room", shortDescription: "Stone-walled room opening onto the terrace, with the gorge directly below.", guestCapacity: 2, bedDescription: "1 king bed", priceFromUgx: 1050000, sizeSqm: 40, features: ["Gorge view", "Terrace access", "Pool", "Breakfast included"], image: LODGE_BED, imageAlt: LODGE_BED_ALT },
-      { slug: "rim-suite", name: "Rim Suite", shortDescription: "The furthest room along the rim, with an outdoor bath under the acacia.", guestCapacity: 2, bedDescription: "1 king bed", priceFromUgx: 1420000, sizeSqm: 56, features: ["Outdoor bath", "Gorge view", "Pool", "Breakfast included"], image: BATH, imageAlt: BATH_ALT },
+      { slug: "gorge-room", name: "Gorge Room", shortDescription: "Stone-walled room opening onto the terrace, with the gorge directly below.", guestCapacity: 2, inventory: 8, bedDescription: "1 king bed", priceFromUgx: 1050000, sizeSqm: 40, features: ["Gorge view", "Terrace access", "Pool", "Breakfast included"], image: LODGE_BED, imageAlt: LODGE_BED_ALT },
+      { slug: "rim-suite", name: "Rim Suite", shortDescription: "The furthest room along the rim, with an outdoor bath under the acacia.", guestCapacity: 2, inventory: 2, bedDescription: "1 king bed", priceFromUgx: 1420000, sizeSqm: 56, features: ["Outdoor bath", "Gorge view", "Pool", "Breakfast included"], image: BATH, imageAlt: BATH_ALT },
     ],
   },
   "ishasha-fig-tree-camp": {
@@ -289,8 +298,8 @@ export const stayDetails: Record<string, StayDetailSeed> = {
     accessibilityNote: "Sandy paths between tents. Solar lanterns are provided for the walk after dark.",
     ratings: { cleanliness: "4.5", location: "4.8", service: "4.7", experience: "4.8" },
     options: [
-      { slug: "fig-tree-tent", name: "Fig Tree Tent", shortDescription: "Canvas under the figs with a bucket shower and a view onto the riverine strip.", guestCapacity: 2, bedDescription: "1 double bed", priceFromUgx: 560000, features: ["Campfire", "Private bathroom", "Guided activities"], image: CANVAS, imageAlt: CANVAS_ALT },
-      { slug: "river-tent-ishasha", name: "River Tent", shortDescription: "The two tents closest to the Ntungwe, where the lions are most often heard.", guestCapacity: 2, bedDescription: "1 queen bed", priceFromUgx: 690000, features: ["River outlook", "Campfire", "Guided activities"], image: TENT_INT, imageAlt: TENT_INT_ALT },
+      { slug: "fig-tree-tent", name: "Fig Tree Tent", shortDescription: "Canvas under the figs with a bucket shower and a view onto the riverine strip.", guestCapacity: 2, inventory: 5, bedDescription: "1 double bed", priceFromUgx: 560000, features: ["Campfire", "Private bathroom", "Guided activities"], image: CANVAS, imageAlt: CANVAS_ALT },
+      { slug: "river-tent-ishasha", name: "River Tent", shortDescription: "The two tents closest to the Ntungwe, where the lions are most often heard.", guestCapacity: 2, inventory: 2, bedDescription: "1 queen bed", priceFromUgx: 690000, features: ["River outlook", "Campfire", "Guided activities"], image: TENT_INT, imageAlt: TENT_INT_ALT },
     ],
   },
 
@@ -310,8 +319,8 @@ export const stayDetails: Record<string, StayDetailSeed> = {
     accessibilityNote: "Rooms are reached by stone steps cut into the outcrop. Not step-free.",
     ratings: { cleanliness: "5.0", location: "5.0", service: "4.9", experience: "5.0" },
     options: [
-      { slug: "valley-room", name: "Valley Room", shortDescription: "Stone and canvas room with its own deck and an outdoor bath facing the plain.", guestCapacity: 2, bedDescription: "1 king bed", priceFromUgx: 1480000, sizeSqm: 46, features: ["Outdoor bath", "Private deck", "Valley view", "Full board"], image: DECK, imageAlt: DECK_ALT },
-      { slug: "outcrop-suite", name: "Outcrop Suite", shortDescription: "The highest room on the rock, with a sitting area and the widest outlook in camp.", guestCapacity: 2, bedDescription: "1 king bed", priceFromUgx: 1980000, sizeSqm: 68, features: ["Outdoor bath", "Sitting room", "Valley view", "Full board"], image: BATH, imageAlt: BATH_ALT },
+      { slug: "valley-room", name: "Valley Room", shortDescription: "Stone and canvas room with its own deck and an outdoor bath facing the plain.", guestCapacity: 2, inventory: 6, bedDescription: "1 king bed", priceFromUgx: 1480000, sizeSqm: 46, features: ["Outdoor bath", "Private deck", "Valley view", "Full board"], image: DECK, imageAlt: DECK_ALT },
+      { slug: "outcrop-suite", name: "Outcrop Suite", shortDescription: "The highest room on the rock, with a sitting area and the widest outlook in camp.", guestCapacity: 2, inventory: 1, bedDescription: "1 king bed", priceFromUgx: 1980000, sizeSqm: 68, features: ["Outdoor bath", "Sitting room", "Valley view", "Full board"], image: BATH, imageAlt: BATH_ALT },
     ],
   },
   "narus-valley-tented-camp": {
@@ -329,7 +338,7 @@ export const stayDetails: Record<string, StayDetailSeed> = {
     accessibilityNote: "Flat ground throughout, though surfaces are natural and uneven in places.",
     ratings: { cleanliness: "4.7", location: "4.9", service: "4.7", experience: "4.9" },
     options: [
-      { slug: "narus-tent", name: "Narus Tent", shortDescription: "Classic safari canvas with a bucket shower behind and the valley in front.", guestCapacity: 2, bedDescription: "1 double bed", priceFromUgx: 690000, features: ["Valley view", "Campfire", "Full board"], image: CANVAS, imageAlt: CANVAS_ALT },
+      { slug: "narus-tent", name: "Narus Tent", shortDescription: "Classic safari canvas with a bucket shower behind and the valley in front.", guestCapacity: 2, inventory: 8, bedDescription: "1 double bed", priceFromUgx: 690000, features: ["Valley view", "Campfire", "Full board"], image: CANVAS, imageAlt: CANVAS_ALT },
     ],
   },
   "apoka-ridge-lodge": {
@@ -347,8 +356,8 @@ export const stayDetails: Record<string, StayDetailSeed> = {
     accessibilityNote: "Level throughout the main building; one room has step-free access from the car park.",
     ratings: { cleanliness: "4.8", location: "4.9", service: "4.9", experience: "4.8" },
     options: [
-      { slug: "ridge-room", name: "Ridge Room", shortDescription: "Deep chairs, a wide veranda and nothing at all to hurry for.", guestCapacity: 2, bedDescription: "1 king bed", priceFromUgx: 980000, sizeSqm: 40, features: ["Veranda", "Valley view", "Full board"], image: LODGE_BED, imageAlt: LODGE_BED_ALT },
-      { slug: "ridge-family-room", name: "Ridge Family Room", shortDescription: "Two interconnecting rooms at the quiet end of the ridge with a shared veranda.", guestCapacity: 4, bedDescription: "1 king bed and 2 singles", priceFromUgx: 1560000, sizeSqm: 66, features: ["Family friendly", "Veranda", "Full board"], image: ROOM_INT, imageAlt: ROOM_INT_ALT },
+      { slug: "ridge-room", name: "Ridge Room", shortDescription: "Deep chairs, a wide veranda and nothing at all to hurry for.", guestCapacity: 2, inventory: 7, bedDescription: "1 king bed", priceFromUgx: 980000, sizeSqm: 40, features: ["Veranda", "Valley view", "Full board"], image: LODGE_BED, imageAlt: LODGE_BED_ALT },
+      { slug: "ridge-family-room", name: "Ridge Family Room", shortDescription: "Two interconnecting rooms at the quiet end of the ridge with a shared veranda.", guestCapacity: 4, inventory: 2, bedDescription: "1 king bed and 2 singles", priceFromUgx: 1560000, sizeSqm: 66, features: ["Family friendly", "Veranda", "Full board"], image: ROOM_INT, imageAlt: ROOM_INT_ALT },
     ],
   },
 
@@ -368,9 +377,9 @@ export const stayDetails: Record<string, StayDetailSeed> = {
     accessibilityNote: "The ridge site involves a steep approach and steps between levels.",
     ratings: { cleanliness: "4.9", location: "5.0", service: "4.9", experience: "4.9" },
     options: [
-      { slug: "ridge-tent-bunyonyi", name: "Ridge Tent", shortDescription: "Tented room on a timber deck with the whole lake in front of it.", guestCapacity: 2, bedDescription: "1 queen bed", priceFromUgx: 640000, sizeSqm: 30, features: ["Lake view", "Private deck", "Breakfast included"], image: CANVAS, imageAlt: CANVAS_ALT },
-      { slug: "lake-suite", name: "Lake Suite", shortDescription: "The largest deck on the ridge, with a bath positioned to face the water.", guestCapacity: 2, bedDescription: "1 king bed", priceFromUgx: 940000, sizeSqm: 44, features: ["Outdoor bath", "Lake view", "Breakfast included"], image: BATH, imageAlt: BATH_ALT },
-      { slug: "ridge-family-tent", name: "Family Tent", shortDescription: "A double tent sharing one deck, suited to a family or two couples travelling together.", guestCapacity: 4, bedDescription: "1 queen bed and 2 singles", priceFromUgx: 1180000, sizeSqm: 52, features: ["Family friendly", "Lake view", "Breakfast included"], image: ROOM_INT, imageAlt: ROOM_INT_ALT },
+      { slug: "ridge-tent-bunyonyi", name: "Ridge Tent", shortDescription: "Tented room on a timber deck with the whole lake in front of it.", guestCapacity: 2, inventory: 6, bedDescription: "1 queen bed", priceFromUgx: 640000, sizeSqm: 30, features: ["Lake view", "Private deck", "Breakfast included"], image: CANVAS, imageAlt: CANVAS_ALT },
+      { slug: "lake-suite", name: "Lake Suite", shortDescription: "The largest deck on the ridge, with a bath positioned to face the water.", guestCapacity: 2, inventory: 3, bedDescription: "1 king bed", priceFromUgx: 940000, sizeSqm: 44, features: ["Outdoor bath", "Lake view", "Breakfast included"], image: BATH, imageAlt: BATH_ALT },
+      { slug: "ridge-family-tent", name: "Family Tent", shortDescription: "A double tent sharing one deck, suited to a family or two couples travelling together.", guestCapacity: 4, inventory: 2, bedDescription: "1 queen bed and 2 singles", priceFromUgx: 1180000, sizeSqm: 52, features: ["Family friendly", "Lake view", "Breakfast included"], image: ROOM_INT, imageAlt: ROOM_INT_ALT },
     ],
   },
   "heron-island-bandas": {
@@ -388,8 +397,8 @@ export const stayDetails: Record<string, StayDetailSeed> = {
     accessibilityNote: "Access is by canoe and a short jetty. Not suitable for limited mobility.",
     ratings: { cleanliness: "4.6", location: "5.0", service: "4.5", experience: "4.8" },
     options: [
-      { slug: "water-banda", name: "Water Banda", shortDescription: "Thatched banda on stilts with the lake directly beneath the floor.", guestCapacity: 2, bedDescription: "1 double bed", priceFromUgx: 430000, features: ["Lake view", "Over-water deck", "Breakfast included"], image: STILT, imageAlt: STILT_ALT },
-      { slug: "island-banda", name: "Island Banda", shortDescription: "The banda set back on the island itself, a little larger and out of the wind.", guestCapacity: 3, bedDescription: "1 double bed and 1 single", priceFromUgx: 520000, features: ["Lake view", "Family friendly", "Breakfast included"], image: FLOAT, imageAlt: FLOAT_ALT },
+      { slug: "water-banda", name: "Water Banda", shortDescription: "Thatched banda on stilts with the lake directly beneath the floor.", guestCapacity: 2, inventory: 5, bedDescription: "1 double bed", priceFromUgx: 430000, features: ["Lake view", "Over-water deck", "Breakfast included"], image: STILT, imageAlt: STILT_ALT },
+      { slug: "island-banda", name: "Island Banda", shortDescription: "The banda set back on the island itself, a little larger and out of the wind.", guestCapacity: 3, inventory: 3, bedDescription: "1 double bed and 1 single", priceFromUgx: 520000, features: ["Lake view", "Family friendly", "Breakfast included"], image: FLOAT, imageAlt: FLOAT_ALT },
     ],
   },
   "kyabahinga-lakeside-camp": {
@@ -407,8 +416,8 @@ export const stayDetails: Record<string, StayDetailSeed> = {
     accessibilityNote: "Terraced grass pitches reached by steps from the parking area.",
     ratings: { cleanliness: "4.2", location: "4.7", service: "4.3", experience: "4.4" },
     options: [
-      { slug: "shoreline-pitch", name: "Shoreline Pitch", shortDescription: "A grass terrace pitch on the water, with power at the kitchen.", guestCapacity: 3, bedDescription: "Bring your own", priceFromUgx: 110000, features: ["Lake view", "Campfire", "Shared kitchen", "Family friendly"], image: DOME, imageAlt: DOME_ALT },
-      { slug: "lakeside-ready-tent", name: "Ready Tent", shortDescription: "A pitched tent with mattresses and bedding, set on the lowest terrace.", guestCapacity: 2, bedDescription: "2 mattresses with bedding", priceFromUgx: 190000, features: ["Lake view", "Bedding provided", "Campfire"], image: DOME, imageAlt: DOME_ALT },
+      { slug: "shoreline-pitch", name: "Shoreline Pitch", shortDescription: "A grass terrace pitch on the water, with power at the kitchen.", guestCapacity: 3, inventory: 12, bedDescription: "Bring your own", priceFromUgx: 110000, features: ["Lake view", "Campfire", "Shared kitchen", "Family friendly"], image: DOME, imageAlt: DOME_ALT },
+      { slug: "lakeside-ready-tent", name: "Ready Tent", shortDescription: "A pitched tent with mattresses and bedding, set on the lowest terrace.", guestCapacity: 2, inventory: 5, bedDescription: "2 mattresses with bedding", priceFromUgx: 190000, features: ["Lake view", "Bedding provided", "Campfire"], image: DOME, imageAlt: DOME_ALT },
     ],
   },
 
@@ -428,8 +437,8 @@ export const stayDetails: Record<string, StayDetailSeed> = {
     accessibilityNote: "Level garden paths; two cabins have step-free entry.",
     ratings: { cleanliness: "4.8", location: "4.7", service: "4.8", experience: "4.7" },
     options: [
-      { slug: "garden-cabin", name: "Garden Cabin", shortDescription: "Timber and stone cabin with a veranda facing the trees.", guestCapacity: 2, bedDescription: "1 queen bed", priceFromUgx: 430000, sizeSqm: 28, features: ["Veranda", "Wi-Fi", "Breakfast included"], image: CABIN, imageAlt: CABIN_ALT },
-      { slug: "family-cabin-jinja", name: "Family Cabin", shortDescription: "The two-bedroom cabin at the end of the garden, with its own sitting room.", guestCapacity: 5, bedDescription: "1 queen bed and 3 singles", priceFromUgx: 780000, sizeSqm: 54, features: ["Two bedrooms", "Family friendly", "Wi-Fi", "Breakfast included"], image: ROOM_INT, imageAlt: ROOM_INT_ALT },
+      { slug: "garden-cabin", name: "Garden Cabin", shortDescription: "Timber and stone cabin with a veranda facing the trees.", guestCapacity: 2, inventory: 8, bedDescription: "1 queen bed", priceFromUgx: 430000, sizeSqm: 28, features: ["Veranda", "Wi-Fi", "Breakfast included"], image: CABIN, imageAlt: CABIN_ALT },
+      { slug: "family-cabin-jinja", name: "Family Cabin", shortDescription: "The two-bedroom cabin at the end of the garden, with its own sitting room.", guestCapacity: 5, inventory: 2, bedDescription: "1 queen bed and 3 singles", priceFromUgx: 780000, sizeSqm: 54, features: ["Two bedrooms", "Family friendly", "Wi-Fi", "Breakfast included"], image: ROOM_INT, imageAlt: ROOM_INT_ALT },
     ],
   },
   "bujagali-rapids-camp": {
@@ -447,8 +456,8 @@ export const stayDetails: Record<string, StayDetailSeed> = {
     accessibilityNote: "Grass pitches on a gentle slope with shared ablutions.",
     ratings: { cleanliness: "4.1", location: "4.7", service: "4.4", experience: "4.6" },
     options: [
-      { slug: "lawn-pitch", name: "Lawn Pitch", shortDescription: "Pitch on the grass above the rapids, with power and water at the block.", guestCapacity: 4, bedDescription: "Bring your own", priceFromUgx: 95000, features: ["Campfire", "Parking", "Wi-Fi", "Family friendly"], image: DOME, imageAlt: DOME_ALT },
-      { slug: "pre-pitched-tent", name: "Pre-pitched Tent", shortDescription: "A dome tent already up on the lawn with mattresses and bedding inside.", guestCapacity: 2, bedDescription: "2 mattresses with bedding", priceFromUgx: 160000, features: ["Bedding provided", "Campfire", "Wi-Fi"], image: DOME, imageAlt: DOME_ALT },
+      { slug: "lawn-pitch", name: "Lawn Pitch", shortDescription: "Pitch on the grass above the rapids, with power and water at the block.", guestCapacity: 4, inventory: 16, bedDescription: "Bring your own", priceFromUgx: 95000, features: ["Campfire", "Parking", "Wi-Fi", "Family friendly"], image: DOME, imageAlt: DOME_ALT },
+      { slug: "pre-pitched-tent", name: "Pre-pitched Tent", shortDescription: "A dome tent already up on the lawn with mattresses and bedding inside.", guestCapacity: 2, inventory: 8, bedDescription: "2 mattresses with bedding", priceFromUgx: 160000, features: ["Bedding provided", "Campfire", "Wi-Fi"], image: DOME, imageAlt: DOME_ALT },
     ],
   },
   "itanda-falls-house": {
@@ -466,7 +475,7 @@ export const stayDetails: Record<string, StayDetailSeed> = {
     accessibilityNote: "Single storey with level access from the driveway to the main rooms.",
     ratings: { cleanliness: "4.7", location: "4.6", service: "4.6", experience: "4.7" },
     options: [
-      { slug: "whole-house", name: "The Whole House", shortDescription: "Four bedrooms, a garden and a veranda, let to one party at a time.", guestCapacity: 8, bedDescription: "2 doubles and 4 singles", priceFromUgx: 720000, sizeSqm: 210, features: ["Whole property", "Kitchen", "Wi-Fi", "Family friendly", "Parking"], image: CABIN, imageAlt: CABIN_ALT },
+      { slug: "whole-house", name: "The Whole House", shortDescription: "Four bedrooms, a garden and a veranda, let to one party at a time.", guestCapacity: 8, inventory: 1, bedDescription: "2 doubles and 4 singles", priceFromUgx: 720000, sizeSqm: 210, features: ["Whole property", "Kitchen", "Wi-Fi", "Family friendly", "Parking"], image: CABIN, imageAlt: CABIN_ALT },
     ],
   },
 
@@ -486,8 +495,8 @@ export const stayDetails: Record<string, StayDetailSeed> = {
     accessibilityNote: "The cabins sit along a sloping ridge with steps between them.",
     ratings: { cleanliness: "4.6", location: "4.9", service: "4.6", experience: "4.8" },
     options: [
-      { slug: "escarpment-cabin", name: "Escarpment Cabin", shortDescription: "Timber cabin on the ridge with a veranda facing the plains.", guestCapacity: 2, bedDescription: "1 double bed", priceFromUgx: 340000, sizeSqm: 26, features: ["Plains view", "Veranda", "Breakfast included"], image: CABIN, imageAlt: CABIN_ALT },
-      { slug: "falls-cabin", name: "Falls Cabin", shortDescription: "The cabin nearest the path down to the middle fall, with the water audible at night.", guestCapacity: 3, bedDescription: "1 double bed and 1 single", priceFromUgx: 420000, sizeSqm: 32, features: ["Waterfall outlook", "Veranda", "Breakfast included"], image: ROOM_INT, imageAlt: ROOM_INT_ALT },
+      { slug: "escarpment-cabin", name: "Escarpment Cabin", shortDescription: "Timber cabin on the ridge with a veranda facing the plains.", guestCapacity: 2, inventory: 6, bedDescription: "1 double bed", priceFromUgx: 340000, sizeSqm: 26, features: ["Plains view", "Veranda", "Breakfast included"], image: CABIN, imageAlt: CABIN_ALT },
+      { slug: "falls-cabin", name: "Falls Cabin", shortDescription: "The cabin nearest the path down to the middle fall, with the water audible at night.", guestCapacity: 3, inventory: 3, bedDescription: "1 double bed and 1 single", priceFromUgx: 420000, sizeSqm: 32, features: ["Waterfall outlook", "Veranda", "Breakfast included"], image: ROOM_INT, imageAlt: ROOM_INT_ALT },
     ],
   },
   "chebonet-coffee-cottage": {
@@ -505,7 +514,7 @@ export const stayDetails: Record<string, StayDetailSeed> = {
     accessibilityNote: "Farm tracks and uneven ground throughout.",
     ratings: { cleanliness: "4.5", location: "4.6", service: "4.8", experience: "4.7" },
     options: [
-      { slug: "farmhouse-room", name: "Farmhouse Room", shortDescription: "One of two rooms in the family house, simple and very quiet.", guestCapacity: 2, bedDescription: "1 double bed", priceFromUgx: 260000, features: ["Breakfast included", "Farm tour", "Family friendly"], image: ROOM_INT, imageAlt: ROOM_INT_ALT },
+      { slug: "farmhouse-room", name: "Farmhouse Room", shortDescription: "One of two rooms in the family house, simple and very quiet.", guestCapacity: 2, inventory: 5, bedDescription: "1 double bed", priceFromUgx: 260000, features: ["Breakfast included", "Farm tour", "Family friendly"], image: ROOM_INT, imageAlt: ROOM_INT_ALT },
     ],
   },
 
@@ -525,9 +534,9 @@ export const stayDetails: Record<string, StayDetailSeed> = {
     accessibilityNote: "Single storey with level access from the drive to all main rooms.",
     ratings: { cleanliness: "4.6", location: "4.6", service: "4.7", experience: "4.6" },
     options: [
-      { slug: "trail-room", name: "Trail Room", shortDescription: "A simple, warm room built for people arriving off the mountain.", guestCapacity: 2, bedDescription: "1 double bed", priceFromUgx: 560000, sizeSqm: 26, features: ["Pool", "Wi-Fi", "Drying room", "Breakfast included"], image: ROOM_INT, imageAlt: ROOM_INT_ALT },
-      { slug: "mountain-suite", name: "Mountain Suite", shortDescription: "The corner suite with a sitting area and the clearest view of the range.", guestCapacity: 3, bedDescription: "1 king bed and 1 single", priceFromUgx: 820000, sizeSqm: 44, features: ["Mountain view", "Sitting room", "Pool", "Breakfast included"], image: LODGE_BED, imageAlt: LODGE_BED_ALT },
-      { slug: "trail-family-room", name: "Family Room", shortDescription: "Two rooms sharing a door, with space for wet boots and packs.", guestCapacity: 4, bedDescription: "1 double bed and 2 singles", priceFromUgx: 940000, sizeSqm: 48, features: ["Family friendly", "Pool", "Wi-Fi", "Breakfast included"], image: CABIN, imageAlt: CABIN_ALT },
+      { slug: "trail-room", name: "Trail Room", shortDescription: "A simple, warm room built for people arriving off the mountain.", guestCapacity: 2, inventory: 7, bedDescription: "1 double bed", priceFromUgx: 560000, sizeSqm: 26, features: ["Pool", "Wi-Fi", "Drying room", "Breakfast included"], image: ROOM_INT, imageAlt: ROOM_INT_ALT },
+      { slug: "mountain-suite", name: "Mountain Suite", shortDescription: "The corner suite with a sitting area and the clearest view of the range.", guestCapacity: 3, inventory: 2, bedDescription: "1 king bed and 1 single", priceFromUgx: 820000, sizeSqm: 44, features: ["Mountain view", "Sitting room", "Pool", "Breakfast included"], image: LODGE_BED, imageAlt: LODGE_BED_ALT },
+      { slug: "trail-family-room", name: "Family Room", shortDescription: "Two rooms sharing a door, with space for wet boots and packs.", guestCapacity: 4, inventory: 3, bedDescription: "1 double bed and 2 singles", priceFromUgx: 940000, sizeSqm: 48, features: ["Family friendly", "Pool", "Wi-Fi", "Breakfast included"], image: CABIN, imageAlt: CABIN_ALT },
     ],
   },
   "crater-lakes-eco-lodge": {
@@ -545,8 +554,8 @@ export const stayDetails: Record<string, StayDetailSeed> = {
     accessibilityNote: "Access involves a walking path and a canoe transfer.",
     ratings: { cleanliness: "4.8", location: "4.9", service: "4.7", experience: "4.9" },
     options: [
-      { slug: "floating-room", name: "Floating Room", shortDescription: "A room built on its own pontoon, with the water on all four sides.", guestCapacity: 2, bedDescription: "1 double bed", priceFromUgx: 480000, sizeSqm: 24, features: ["Lake view", "Solar powered", "Breakfast included"], image: FLOAT, imageAlt: FLOAT_ALT },
-      { slug: "shore-cabin", name: "Shore Cabin", shortDescription: "The one land-based cabin, set into the crater wall above the water.", guestCapacity: 3, bedDescription: "1 double bed and 1 single", priceFromUgx: 560000, sizeSqm: 30, features: ["Crater view", "Family friendly", "Breakfast included"], image: CABIN, imageAlt: CABIN_ALT },
+      { slug: "floating-room", name: "Floating Room", shortDescription: "A room built on its own pontoon, with the water on all four sides.", guestCapacity: 2, inventory: 2, bedDescription: "1 double bed", priceFromUgx: 480000, sizeSqm: 24, features: ["Lake view", "Solar powered", "Breakfast included"], image: FLOAT, imageAlt: FLOAT_ALT },
+      { slug: "shore-cabin", name: "Shore Cabin", shortDescription: "The one land-based cabin, set into the crater wall above the water.", guestCapacity: 3, inventory: 6, bedDescription: "1 double bed and 1 single", priceFromUgx: 560000, sizeSqm: 30, features: ["Crater view", "Family friendly", "Breakfast included"], image: CABIN, imageAlt: CABIN_ALT },
     ],
   },
 };

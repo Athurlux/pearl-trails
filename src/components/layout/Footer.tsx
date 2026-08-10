@@ -74,10 +74,17 @@ export async function Footer() {
 
         <div className="mt-14 border-t border-ivory/12 pt-8">
           <p className="max-w-3xl text-[0.8rem] leading-relaxed text-ivory/45">
-            Pearl Trails Release 1 is a demonstration build. Properties, prices and
+            {/*
+              Kept accurate release by release. Booking requests became real in
+              Release 4, so the old blanket "booking is not available" line would
+              now be false — but payments and accounts genuinely do not exist,
+              and saying so is the difference between a demo and a misrepresentation.
+            */}
+            Pearl Trails is a demonstration build. Properties, prices, availability and
             itineraries shown are original examples created for this preview and do not
-            represent real businesses or live rates. Booking, payments and accounts are
-            not yet available.
+            represent real businesses or live rates. Reservation requests are stored and
+            given a reference, but no payment is taken, no account is created, and no
+            real lodge is contacted.
           </p>
           <p className="mt-6 text-[0.8rem] text-ivory/40">
             &copy; {year} Pearl Trails · Stays that stay with you.

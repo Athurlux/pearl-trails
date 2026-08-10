@@ -13,6 +13,8 @@
 export const MAX_TRIP_GUESTS = 16;
 /** A planning horizon, not a policy: keeps absurd URLs out of the UI. */
 export const MAX_TRIP_NIGHTS = 30;
+/** Bounds the `exp` parameter. A stay links about five experiences. */
+export const MAX_TRIP_EXPERIENCES = 12;
 
 export interface TripContext {
   checkIn: string | null;
@@ -20,6 +22,15 @@ export interface TripContext {
   guests: number | null;
   /** Slug of the chosen accommodation option, scoped to the current property. */
   option: string | null;
+  /**
+   * Slugs of experiences the traveller has picked (Release 4).
+   *
+   * Trip context only — carrying it in the URL keeps the booking flow
+   * refreshable and shareable. Traveller details never join it: name, email,
+   * phone and requests are personal information and stay in memory until they
+   * are posted to the server action.
+   */
+  experiences: string[];
 }
 
 type Raw = Record<string, string | string[] | undefined>;
@@ -78,11 +89,26 @@ export function parseTripContext(raw: Raw): TripContext {
 
   const option = one(raw, "option");
 
+  // Comma-separated slugs, whitelisted by shape, de-duplicated and capped —
+  // the same discipline every other URL parameter follows.
+  const rawExperiences = one(raw, "exp");
+  const experiences = rawExperiences
+    ? [
+        ...new Set(
+          rawExperiences
+            .split(",")
+            .map((slug) => slug.trim())
+            .filter((slug) => SLUG.test(slug)),
+        ),
+      ].slice(0, MAX_TRIP_EXPERIENCES)
+    : [];
+
   return {
     checkIn,
     checkOut,
     guests,
     option: option && SLUG.test(option) ? option : null,
+    experiences,
   };
 }
 
@@ -92,6 +118,7 @@ export function buildTripQuery(trip: Partial<TripContext>): string {
   if (trip.checkOut) s.set("checkOut", trip.checkOut);
   if (trip.guests != null) s.set("guests", String(trip.guests));
   if (trip.option) s.set("option", trip.option);
+  if (trip.experiences?.length) s.set("exp", trip.experiences.join(","));
   const qs = s.toString();
   return qs ? `?${qs}` : "";
 }

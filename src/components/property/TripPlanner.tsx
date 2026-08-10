@@ -248,12 +248,14 @@ export function TripPlanner({
       </Link>
 
       {/*
-        Deliberate, and worth keeping: there is no availability model behind
-        this page, so the card must not imply the dates are held.
+        Still deliberate, and updated for Release 4. This page performs no
+        availability query — that happens in the booking flow — so it must not
+        imply these dates are held. But "availability is not checked yet" would
+        now read as though it is never checked, which is equally untrue.
       */}
       <p className="mt-3 text-center text-[0.75rem] leading-relaxed text-muted">
-        Dates are trip planning only. Availability is not checked yet and nothing is
-        reserved.
+        An estimate for planning. Availability is checked in the next step, and nothing
+        is held until you submit a request.
       </p>
     </div>
   );

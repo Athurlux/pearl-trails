@@ -1,5 +1,5 @@
 import { config } from "dotenv";
-import { eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, notInArray, sql } from "drizzle-orm";
 import { getDb } from "./index";
 import {
   accommodationOptions,
@@ -207,23 +207,63 @@ async function seedRelease3(
     );
     imageCount += picks.length;
 
-    await db.delete(accommodationOptions).where(eq(accommodationOptions.stayId, id));
-    await db.insert(accommodationOptions).values(
-      detail.options.map((option, i) => ({
-        stayId: id,
-        slug: option.slug,
-        name: option.name,
-        shortDescription: option.shortDescription,
-        guestCapacity: option.guestCapacity,
-        bedDescription: option.bedDescription,
-        priceFromUgx: option.priceFromUgx,
-        currency: "UGX",
-        sizeSqm: option.sizeSqm ?? null,
-        features: option.features,
-        image: option.image,
-        imageAlt: option.imageAlt,
-        position: i,
-      })),
+    /*
+      Upsert, not delete-and-reinsert.
+
+      Release 4 made `bookings.accommodation_option_id` a foreign key with
+      ON DELETE RESTRICT, so clearing this table would fail the moment one
+      reservation request existed — and if it did not fail, re-seeding would
+      hand every existing booking a brand new option id. Keyed on the natural
+      (stay, slug) pair, which is already unique.
+    */
+    await db
+      .insert(accommodationOptions)
+      .values(
+        detail.options.map((option, i) => ({
+          stayId: id,
+          slug: option.slug,
+          name: option.name,
+          shortDescription: option.shortDescription,
+          guestCapacity: option.guestCapacity,
+          inventoryCount: option.inventory,
+          bedDescription: option.bedDescription,
+          priceFromUgx: option.priceFromUgx,
+          currency: "UGX",
+          sizeSqm: option.sizeSqm ?? null,
+          features: option.features,
+          image: option.image,
+          imageAlt: option.imageAlt,
+          position: i,
+        })),
+      )
+      .onConflictDoUpdate({
+        target: [accommodationOptions.stayId, accommodationOptions.slug],
+        set: {
+          name: excluded("name"),
+          shortDescription: excluded("short_description"),
+          guestCapacity: excluded("guest_capacity"),
+          inventoryCount: excluded("inventory_count"),
+          bedDescription: excluded("bed_description"),
+          priceFromUgx: excluded("price_from_ugx"),
+          sizeSqm: excluded("size_sqm"),
+          features: excluded("features"),
+          image: excluded("image"),
+          imageAlt: excluded("image_alt"),
+          position: excluded("position"),
+        },
+      });
+
+    // Options dropped from the seed still disappear, preserving replace-not-append
+    // semantics — but if a booking holds one, Postgres refuses and the operator
+    // hears about it instead of losing reservation history silently.
+    await db.delete(accommodationOptions).where(
+      and(
+        eq(accommodationOptions.stayId, id),
+        notInArray(
+          accommodationOptions.slug,
+          detail.options.map((o) => o.slug),
+        ),
+      ),
     );
     optionCount += detail.options.length;
   }

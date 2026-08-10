@@ -16,6 +16,8 @@ const eslintConfig = defineConfig([
     ".open-next/**",
     ".wrangler/**",
     "cloudflare-env.d.ts",
+    // Local scratch: gitignored throwaway scripts, not part of the project.
+    "tmp/**",
   ]),
 ]);
 

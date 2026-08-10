@@ -15,6 +15,13 @@
       "when": 1786314405140,
       "tag": "0001_robust_risque",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1786321695176,
+      "tag": "0002_release4_bookings",
+      "breakpoints": true
     }
   ]
 }

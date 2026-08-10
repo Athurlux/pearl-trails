@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  MAX_TRIP_EXPERIENCES,
   MAX_TRIP_NIGHTS,
+  buildTripQuery,
   estimateStay,
   formatDateRange,
   nightsBetween,
@@ -54,6 +56,9 @@ describe("parseTripContext", () => {
       checkOut: null,
       guests: null,
       option: null,
+      // Release 4 extended trip context with experience slugs. An absent `exp`
+      // is an empty selection, not null — nothing chosen is still a valid trip.
+      experiences: [],
     });
   });
 
@@ -70,7 +75,45 @@ describe("parseTripContext", () => {
       checkOut: "2026-09-15",
       guests: 2,
       option: "forest-suite",
+      experiences: [],
     });
+  });
+
+  it("parses experience slugs, rejecting anything malformed", () => {
+    expect(parseTripContext({ exp: "game-drive,bird-watching" }).experiences).toEqual([
+      "game-drive",
+      "bird-watching",
+    ]);
+    // Whitespace tolerated, duplicates collapsed, non-slug values discarded —
+    // the same whitelist discipline every other URL parameter follows.
+    expect(
+      parseTripContext({ exp: " game-drive , game-drive ,Bad Slug!,boat-safari" })
+        .experiences,
+    ).toEqual(["game-drive", "boat-safari"]);
+    expect(parseTripContext({ exp: "" }).experiences).toEqual([]);
+    expect(parseTripContext({ exp: "<script>" }).experiences).toEqual([]);
+  });
+
+  it("caps the number of experiences carried in the URL", () => {
+    const many = Array.from({ length: 40 }, (_, i) => `experience-${i}`).join(",");
+    expect(parseTripContext({ exp: many }).experiences).toHaveLength(
+      MAX_TRIP_EXPERIENCES,
+    );
+  });
+
+  it("round-trips trip context through buildTripQuery", () => {
+    const trip = parseTripContext({
+      checkIn: "2026-09-12",
+      checkOut: "2026-09-15",
+      guests: "3",
+      option: "forest-suite",
+      exp: "game-drive,boat-safari",
+    });
+    const query = buildTripQuery(trip);
+    const reparsed = parseTripContext(
+      Object.fromEntries(new URLSearchParams(query.slice(1)).entries()),
+    );
+    expect(reparsed).toEqual(trip);
   });
 
   it("drops a checkout that is not after the checkin", () => {

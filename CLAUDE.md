@@ -5,11 +5,12 @@ workflow live in `~/.claude/CLAUDE.md` and are **not** repeated here.
 
 ## Status
 
-**Release 3 shipped: property detail pages on top of Explore Stays.**
+**Release 4 shipped: reservation requests, with real availability.**
 
-The catalogue lives in Neon Postgres and is the single source of truth. There is still no
-auth, no availability, no booking and no payments. Do not add a queue, cache, search
-engine or background worker without a decision record in `docs/decisions/`.
+The catalogue lives in Neon Postgres and is the single source of truth. A traveller can
+now request a booking end to end and gets a persisted reference back. There is still no
+auth, no payment, no notification and no operator tooling. Do not add a queue, cache,
+search engine or background worker without a decision record in `docs/decisions/`.
 
 ## What this is
 
@@ -70,16 +71,63 @@ server-side error while users only see the branded error page.
 | `/` | dynamic | reads the catalogue; states real counts |
 | `/stays` | dynamic | Explore; all state in the URL |
 | `/stays/[slug]` | dynamic | property detail: gallery, options, experiences |
-| `/book/[slug]` | dynamic | trip-context hand-off; `noindex`; flow lands in R4 |
+| `/book/[slug]` | dynamic | the booking flow; `noindex` |
+| `/booking/[reference]` | dynamic | confirmation; `noindex`, no social metadata |
 
 **Trip context** (`src/lib/trip-params.ts`) is a second, smaller URL contract carried from
-Explore into a property and on to `/book`: `checkIn`, `checkOut`, `guests`, `option`.
-Dates are compared as `YYYY-MM-DD` strings parsed in UTC so a browser in another timezone
-cannot shift a Ugandan check-in by a day. An `option` slug from the URL is only honoured
-after checking it belongs to the property being viewed.
+Explore into a property and on into `/book`: `checkIn`, `checkOut`, `guests`, `option`,
+`exp`. Dates are compared as `YYYY-MM-DD` strings parsed in UTC so a browser in another
+timezone cannot shift a Ugandan check-in by a day. An `option` slug from the URL is only
+honoured after checking it belongs to the property being viewed, and the server re-checks
+it on submit.
 
-**There is still no availability model.** The planner says "estimated" and "nothing is
-reserved", and must keep saying so until real inventory exists.
+**Traveller PII never enters the URL.** Name, email, phone and notes live in component
+state until they are posted to the server action. Trip context is shareable; a person is
+not.
+
+## Booking (Release 4)
+
+Read `docs/decisions/001`–`003` before changing any of this. The short version:
+
+- **Availability** = `accommodation_options.inventory_count` minus blocking bookings whose
+  `daterange(check_in, check_out, '[)')` overlaps the request. Half-open, so a checkout on
+  the 15th does not conflict with a check-in on the 15th.
+- **Blocking statuses** are `pending` and `confirmed`. `cancelled` and `expired` release
+  the unit. This list lives in `src/lib/booking-status.ts` **and** in the `WHERE` clause of
+  the `bookings_no_overlapping_unit` exclusion constraint. Changing one without migrating
+  the other makes the query offer a unit the database then refuses — a test asserts they
+  agree.
+- **No double-booking is enforced by Postgres**, not by application code: an
+  `EXCLUDE USING gist` constraint over (option, unit_index, daterange). This is why the
+  system is safe without transactions — `drizzle-orm/neon-http` throws on
+  `db.transaction()` and only supports `db.batch()`. Creation is one atomic statement that
+  picks a free `unit_index`, inserts the booking and its experiences together; a lost race
+  surfaces as SQLSTATE `23P01` and is retried.
+- **Idempotency**: the browser mints a `requestToken` UUID per attempt, stored under a
+  unique index. `createBookingRequest` checks the token *before* availability — otherwise
+  a replay of the booking that took the last unit would be told "unavailable", which is
+  the one traveller who definitely holds it.
+- **Nothing about money comes from the client.** There is no total, subtotal or rate field
+  in the form. The server reloads catalogue prices and recomputes.
+- **The reference is a credential.** `/booking/[reference]` is readable by anyone holding
+  it, so email and phone are masked, no internal ids are exposed, and the page emits no
+  Open Graph or Twitter metadata at all. That last part needs `openGraph: null` and
+  `twitter: null` explicitly — Next.js metadata is **inherited**, so omitting them leaves
+  the root layout's card in place. `/book/[slug]` does the same.
+- **A sold-out option cannot be carried forward.** Availability blocks step 1
+  (`validateOptionChoice`) and the flow opens on a bookable option
+  (`chooseInitialOption`). Without this the traveller filled in dates, experiences and
+  their personal details before the submit-time check rejected them — safe, because the
+  exclusion constraint held, but four steps too late to be usable.
+
+Layering: `src/lib/booking-rules.ts` is pure and shared by client and server (validation,
+pricing, reference generation); `src/lib/booking-query.ts` is `server-only` and owns
+persistence; `src/app/book/[slug]/actions.ts` is the submission boundary.
+
+**`actions.ts` may export only async functions.** A `"use server"` file that exports a
+constant fails at request time with "A 'use server' file can only export async functions"
+— and neither `tsc` nor `next build` catches it. `BookingActionState` and
+`initialBookingState` therefore live in `booking-rules.ts`.
 
 URL parameter names are a contract: `q`, `destination`, `type`, `amenity`, `minPrice`,
 `maxPrice`, `guests`, `minRating`, `sort`, `page`, `checkIn`, `checkOut`. Parsing and
@@ -97,8 +145,14 @@ a clamp, never by reading `searchParams` directly in a component.
 - Galleries render **one DOM node per image**, reshaped by CSS. A separate mobile rail
   and desktop grid looked identical but downloaded every photograph twice.
 - Release 3 tables: `stay_images`, `accommodation_options`, `experiences`,
-  `stay_experiences`, plus policy/highlight/rating columns on `stays`. Accommodation
-  options are descriptive products — there is no unit count and no availability.
+  `stay_experiences`, plus policy/highlight/rating columns on `stays`.
+- Release 4 tables: `bookings`, `booking_experiences`, the `booking_status` enum, and
+  `inventory_count` on `accommodation_options`. Bookings snapshot the nightly rate,
+  night count, subtotals and each experience's name and price, so a later repricing
+  cannot rewrite what a traveller actually requested.
+- The seed **upserts** accommodation options rather than deleting and reinserting them:
+  `bookings` references them with `ON DELETE RESTRICT`, so clearing the table would fail
+  the moment one reservation existed.
 - Filter, sort and pagination state belongs in the **URL**, not React state. That is what
   makes searches shareable and the back button work.
 - All filtering happens in Postgres. Never fetch the catalogue and filter in the browser.
@@ -120,9 +174,13 @@ misrepresentation.
 - Structured data stays limited to `WebSite`/`Organization`. **Do not** emit
   `LodgingBusiness`, `Hotel`, `Offer` or `AggregateRating` for invented properties.
 - **Counts and dates must be true.** Category and destination tiles read their counts
-  from the database rather than carrying hardcoded numbers. Check-in and check-out are
-  carried through the URL and displayed, but there is no availability model — never
-  render "available for your dates" or anything equivalent.
+  from the database rather than carrying hardcoded numbers. Availability shown in the
+  booking flow is a real query, so "2 left for your dates" is allowed — but it is a
+  reading, not a hold, and the UI says so. Nothing is reserved until submission.
+- **Never claim more than happened.** A submitted request is `pending`: stored, holding a
+  unit, and *not* seen by any property. Never render "confirmed", "paid", "guaranteed" or
+  a specific activity time. No payment is taken and no email or SMS is sent — the
+  confirmation page and the footer both state this plainly.
 - **Look at every image before using it.** Three "safari camp" photos in the first pass
   were Wadi Rum and the Sahara. Alt text must describe what is actually in the frame,
   and the photo must plausibly depict the place it is captioned as.
@@ -171,12 +229,24 @@ npm run deploy       # build and deploy to Cloudflare Workers
 ```
 
 The quality gate before any deploy is: `lint` → `typecheck` → `test` → `db:migrate` →
-`build` → **cold-load** `/` and `/stays` from the production build and confirm the
-controls actually respond → check 1440 / 1024 / 768 / 390 → no console errors → no
-horizontal overflow.
+`build` → **cold-load** `/`, `/stays` and `/book/[slug]` from the production build and
+confirm the controls actually respond → submit one real booking and reload its
+confirmation page → check 1440 / 1024 / 768 / 390 → no console errors → no horizontal
+overflow.
 
 Cold-load specifically: a client-side navigation can hide a hydration failure that a
-fresh page load exposes.
+fresh page load exposes. Submitting specifically: `"use server"` export rules and server
+action wiring fail only at request time, not at build time.
+
+Booking tests write rows tagged `@booking-test.invalid` (an RFC 2606 reserved TLD) and
+clean up by that marker, never by date range — the Neon branch is shared with demo data.
+`npm run test` needs `DATABASE_URL`; without it the DB suites skip themselves.
+
+**That marker is a delete list, so never give a booking you want to keep an
+`@booking-test.invalid` address.** A demo reservation created with one survives until the
+next `npm run test`, then vanishes — including from production, which is the same Neon
+branch. Demo bookings use `@pearltrails.example` (also reserved, also undeliverable, but
+not swept). Scratch scripts belong in `tmp/`, which is ignored by git, eslint and tsc.
 
 <!-- BEGIN:nextjs-agent-rules -->
 

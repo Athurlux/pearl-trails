@@ -376,6 +376,8 @@ export interface PropertyDetail {
     name: string;
     shortDescription: string;
     guestCapacity: number;
+    /** Units the property has. Server-side input to availability, not a client prop. */
+    inventoryCount: number;
     bedDescription: string;
     priceFromUgx: number;
     currency: string;
@@ -468,6 +470,7 @@ export async function getPropertyDetail(slug: string): Promise<PropertyDetail | 
         name: accommodationOptions.name,
         shortDescription: accommodationOptions.shortDescription,
         guestCapacity: accommodationOptions.guestCapacity,
+        inventoryCount: accommodationOptions.inventoryCount,
         bedDescription: accommodationOptions.bedDescription,
         priceFromUgx: accommodationOptions.priceFromUgx,
         currency: accommodationOptions.currency,
