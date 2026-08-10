@@ -4,6 +4,97 @@
 
 Lodges, campsites and experiences across Uganda — the Pearl of Africa.
 
+## Release 5 — My Trip & Itinerary
+
+A booking becomes a trip. Every reservation has a private page laying out the stay day by
+day, with the requested experiences already on it, and room for the traveller's own plans.
+
+### The journey
+
+```
+Booking confirmation  →  Open my trip  →  /trip/[token]
+                                            ├─ day-by-day timeline
+                                            ├─ add / edit / remove your own plans
+                                            ├─ move a requested experience
+                                            ├─ private notes
+                                            └─ print a clean itinerary
+```
+
+### How access works
+
+The booking reference still opens the read-only confirmation page, exactly as in Release
+4. It does **not** open the trip.
+
+A trip is guarded by its own 160-bit token, and only a SHA-256 hash of that token is
+stored — a dump of the `bookings` table hands nobody a working trip URL. There are two
+ways to get one and no third:
+
+- the submit redirect carries it once, validated against that booking before the link is
+  rendered;
+- or the traveller proves the email address on the booking, which mints a **new** token.
+  Recovery rotates, because a hash cannot be reversed — an older saved link stops working,
+  and the form says so before it is submitted.
+
+A wrong email and a reference that does not exist produce the identical answer, so this
+cannot be used to discover which references are real.
+
+Trip pages are `noindex, nofollow`, emit no social card, and set `referrer: no-referrer`
+so an outbound click cannot leak the address.
+
+### What the traveller may change
+
+| Item | Comes from | They may |
+| --- | --- | --- |
+| Check-in, check-out | the booking and the property's published times | nothing |
+| A requested experience | the Release 4 booking | move the day and time of day |
+| Anything they added | themselves | edit and delete freely |
+
+That is enforced in the `WHERE` clause of every mutation, not by which buttons render.
+Removing an experience from the plan is not the same act as removing it from the booking,
+and this release cannot do the second — it says so rather than pretending.
+
+### What makes it correct
+
+- **Generation is idempotent by constraint.** Opening a trip runs
+  `INSERT … ON CONFLICT DO NOTHING` against two partial unique indexes, so a refresh, a
+  double-tap or six concurrent visits still produce exactly one check-in. A test fires six
+  at once.
+- **The first visit is the backfill.** Bookings made before this release get their
+  itinerary when someone opens the trip. There is no backfill migration.
+- **Traveller dates are bounded inside the write** — the insert filters on the booking's
+  own dates, so there is no window between checking and writing.
+- **Planning is deterministic.** The same booking always produces the same starting plan:
+  check-in on arrival, experiences spread across the full days, check-out on departure.
+  No model, no clock, no randomness.
+- **Only check-in and check-out carry a clock time.** Everything else is
+  morning/afternoon/evening/flexible, because nothing has been scheduled with a guide or
+  a permit office and printing "08:00" would invent an appointment.
+
+### New database objects
+
+`itinerary_items` (with `itinerary_source`, `itinerary_system_kind` and `time_of_day`
+enums), plus `trip_token_hash` and `trip_note` on `bookings`. Migration
+`0003_condemned_liz_osborn.sql` adds the token column nullable, backfills it, then sets
+`NOT NULL` — the generated one-step `ADD COLUMN ... NOT NULL` fails against a table that
+already has rows.
+
+### Deferred on purpose
+
+Payments (see below), traveller accounts, notifications, read-only share links, operator
+confirmation of activity times, and offline caching.
+
+## Payments — deliberately not built
+
+There is no payment layer, and the product never implies one. Release 6 was scoped and
+then deferred: Pearl Trails has no merchant account and no provider sandbox credentials,
+and a payment integration is mostly the integration — the parts that are hard cannot be
+learned from a simulator written by the same person writing the code under test. A "Pay"
+button that cannot take money is a claim, not a feature.
+
+Every price is labelled an estimate, and the totals stored on a booking are snapshots of
+what a traveller was quoted, not an amount owed. See
+`docs/decisions/005-payments-deferred.md` for what would need to be true to start.
+
 ## Release 4 — Booking Flow & Reservation Requests
 
 Pearl Trails stops being a discovery product and becomes a reservation-request product. A

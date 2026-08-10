@@ -14,6 +14,7 @@ import {
   BLOCKING_BOOKING_STATUSES,
   type BookingStatus,
 } from "./booking-status";
+import { mintTripToken } from "./trip-query";
 import {
   type FieldErrors,
   MAX_BOOKING_EXPERIENCES,
@@ -161,8 +162,15 @@ export interface CreateBookingInput {
 }
 
 export type CreateBookingResult =
-  | { status: "created"; reference: string }
-  /** An idempotent replay — the booking already existed under this token. */
+  /** `tripToken` is the raw credential, returned exactly once — only a hash is stored. */
+  | { status: "created"; reference: string; tripToken: string }
+  /**
+   * An idempotent replay — the booking already existed under this token.
+   *
+   * No `tripToken`: the original was handed out on the first submission and
+   * cannot be recovered from the stored hash. A replay lands on the
+   * confirmation page, which offers the email path to reissue one.
+   */
   | { status: "duplicate"; reference: string }
   | { status: "invalid"; errors: FieldErrors; formError?: string }
   | { status: "unavailable"; formError: string }
@@ -304,6 +312,16 @@ export async function createBookingRequest(
   const maxAttempts = Math.min(option.inventoryCount, 12) + 2;
   let reference = generateBookingReference(now);
 
+  /*
+    The trip credential (Release 5).
+
+    Minted once, before the retry loop, so a retried insert reuses the same
+    token rather than issuing one the caller never sees. Only the hash is
+    stored; `tripToken` is returned to the traveller exactly once and can never
+    be read back out of the database.
+  */
+  const trip = await mintTripToken();
+
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     try {
       const inserted = await db.execute<{ reference: string }>(sql`
@@ -331,7 +349,8 @@ export async function createBookingRequest(
             nightly_rate_ugx, accommodation_subtotal_ugx,
             experiences_subtotal_ugx, estimated_total_ugx,
             currency, status,
-            guest_name, guest_email, guest_phone, guest_country, special_requests
+            guest_name, guest_email, guest_phone, guest_country, special_requests,
+            trip_token_hash
           )
           SELECT
             ${reference}, ${input.requestToken}::uuid, ${option.stayId},
@@ -341,7 +360,8 @@ export async function createBookingRequest(
             ${estimate.experiencesSubtotalUgx}, ${estimate.estimatedTotalUgx},
             ${option.currency}, 'pending',
             ${traveller.guestName}, ${traveller.guestEmail}, ${traveller.guestPhone},
-            ${traveller.guestCountry}, ${traveller.specialRequests}
+            ${traveller.guestCountry}, ${traveller.specialRequests},
+            ${trip.hash}
           FROM free
           RETURNING id, reference
         ),
@@ -376,7 +396,7 @@ export async function createBookingRequest(
           formError: "This accommodation is no longer available for the dates you chose.",
         };
       }
-      return { status: "created", reference: row.reference };
+      return { status: "created", reference: row.reference, tripToken: trip.token };
     } catch (error) {
       // Idempotent replay: this token already produced a booking. Hand back the
       // original rather than creating a second one or showing a failure.

@@ -19,6 +19,14 @@ import {
 } from "drizzle-orm/pg-core";
 import { relations, sql } from "drizzle-orm";
 import { BOOKING_STATUSES } from "@/lib/booking-status";
+import {
+  ITINERARY_SOURCES,
+  ITINERARY_SYSTEM_KINDS,
+  MAX_ITINERARY_NOTE,
+  MAX_ITINERARY_TITLE,
+  MAX_TRIP_NOTE,
+  TIME_OF_DAY,
+} from "@/lib/itinerary-vocab";
 import { STAY_TYPES } from "@/lib/stay-types";
 
 /**
@@ -31,6 +39,12 @@ import { STAY_TYPES } from "@/lib/stay-types";
 
 export const stayTypeEnum = pgEnum("stay_type", STAY_TYPES);
 export const bookingStatusEnum = pgEnum("booking_status", BOOKING_STATUSES);
+export const itinerarySourceEnum = pgEnum("itinerary_source", ITINERARY_SOURCES);
+export const itinerarySystemKindEnum = pgEnum(
+  "itinerary_system_kind",
+  ITINERARY_SYSTEM_KINDS,
+);
+export const timeOfDayEnum = pgEnum("time_of_day", TIME_OF_DAY);
 
 export const destinations = pgTable(
   "destinations",
@@ -322,12 +336,25 @@ export const bookings = pgTable(
     guestCountry: varchar("guest_country", { length: 56 }).notNull(),
     specialRequests: varchar("special_requests", { length: 1000 }),
 
+    /**
+     * Release 5. SHA-256 of the trip token, never the token itself — read
+     * access to this table must not become write access to every trip. The raw
+     * value exists only in the traveller's `/trip/[token]` URL.
+     *
+     * See `docs/decisions/004-trip-access-and-itinerary-ownership.md`.
+     */
+    tripTokenHash: varchar("trip_token_hash", { length: 64 }).notNull(),
+
+    /** The traveller's own private note about the trip. Plain text, bounded. */
+    tripNote: varchar("trip_note", { length: MAX_TRIP_NOTE }),
+
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
     uniqueIndex("bookings_reference_key").on(t.reference),
     uniqueIndex("bookings_request_token_key").on(t.requestToken),
+    uniqueIndex("bookings_trip_token_hash_key").on(t.tripTokenHash),
 
     /**
      * The composite parent key. An option id alone would let a booking claim
@@ -399,6 +426,118 @@ export const bookingExperiences = pgTable(
   ],
 );
 
+/**
+ * One line on a trip's day-by-day plan.
+ *
+ * The booking owns the itinerary outright — there is no `Trip` entity, because
+ * in this product one booking *is* one trip and a separate table would carry a
+ * foreign key and nothing else.
+ *
+ * `source` is the access-control column, not a display category. It decides
+ * what a traveller may touch, and that rule is applied in the `WHERE` clause of
+ * every mutation rather than by which buttons get rendered:
+ *
+ *   system      check-in / check-out          — read only
+ *   experience  requested with the booking    — may be moved, never deleted
+ *   traveller   added by the traveller        — theirs entirely
+ *
+ * Two **partial** unique indexes are what make generation idempotent. Opening a
+ * trip inserts any missing base items with `ON CONFLICT DO NOTHING`, so a
+ * refresh, a double-tap or two concurrent visits still produce exactly one
+ * check-in. Checking first and inserting after would be a race.
+ */
+export const itineraryItems = pgTable(
+  "itinerary_items",
+  {
+    id: serial("id").primaryKey(),
+    bookingId: integer("booking_id")
+      .notNull()
+      .references(() => bookings.id, { onDelete: "cascade" }),
+
+    source: itinerarySourceEnum("source").notNull(),
+
+    /** Set only on `system` rows — the half of the pair this item is. */
+    systemKind: itinerarySystemKindEnum("system_kind"),
+
+    /**
+     * Set only on `experience` rows. Points at the *booking's* experience
+     * snapshot rather than the catalogue, so renaming or repricing an
+     * experience cannot restate what a traveller asked for.
+     */
+    bookingExperienceId: integer("booking_experience_id").references(
+      () => bookingExperiences.id,
+      { onDelete: "cascade" },
+    ),
+
+    /**
+     * The calendar day this sits on, in Uganda. Bounded to the booking's
+     * `[check_in, check_out]` by the insert statement itself — a CHECK cannot
+     * see the parent row, and validating before writing would leave a window.
+     */
+    day: date("day", { mode: "string" }).notNull(),
+
+    timeOfDay: timeOfDayEnum("time_of_day").notNull().default("flexible"),
+
+    /**
+     * A real clock time, and only where one honestly exists: check-in and
+     * check-out, taken from the property's published times. Everything else is
+     * a time of day, because nothing has been scheduled with anyone.
+     */
+    exactTime: varchar("exact_time", { length: 5 }),
+
+    title: varchar("title", { length: MAX_ITINERARY_TITLE }).notNull(),
+    note: varchar("note", { length: MAX_ITINERARY_NOTE }),
+
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("itinerary_items_booking_day_idx").on(t.bookingId, t.day),
+
+    // Idempotent generation. Partial, so traveller rows — which have neither
+    // column set — are not forced into a single row per booking.
+    uniqueIndex("itinerary_items_system_kind_key")
+      .on(t.bookingId, t.systemKind)
+      .where(sql`${t.systemKind} IS NOT NULL`),
+    uniqueIndex("itinerary_items_booking_experience_key")
+      .on(t.bookingId, t.bookingExperienceId)
+      .where(sql`${t.bookingExperienceId} IS NOT NULL`),
+
+    /**
+     * Provenance and its supporting columns cannot disagree. Without this a
+     * `traveller` row could carry `system_kind = 'check_out'` and become
+     * undeletable, or a `system` row could be written with no kind and escape
+     * the unique index that stops duplicates.
+     */
+    check(
+      "itinerary_items_source_shape",
+      sql`(
+        (${t.source} = 'system'
+           AND ${t.systemKind} IS NOT NULL
+           AND ${t.bookingExperienceId} IS NULL)
+        OR (${t.source} = 'experience'
+           AND ${t.systemKind} IS NULL
+           AND ${t.bookingExperienceId} IS NOT NULL)
+        OR (${t.source} = 'traveller'
+           AND ${t.systemKind} IS NULL
+           AND ${t.bookingExperienceId} IS NULL)
+      )`,
+    ),
+    check("itinerary_items_title_not_blank", sql`length(btrim(${t.title})) > 0`),
+  ],
+);
+
+export const itineraryItemsRelations = relations(itineraryItems, ({ one }) => ({
+  booking: one(bookings, {
+    fields: [itineraryItems.bookingId],
+    references: [bookings.id],
+  }),
+  bookingExperience: one(bookingExperiences, {
+    fields: [itineraryItems.bookingExperienceId],
+    references: [bookingExperiences.id],
+  }),
+}));
+
 export const destinationsRelations = relations(destinations, ({ many }) => ({
   stays: many(stays),
   experiences: many(experiences),
@@ -411,6 +550,7 @@ export const bookingsRelations = relations(bookings, ({ one, many }) => ({
     references: [accommodationOptions.id],
   }),
   experiences: many(bookingExperiences),
+  itinerary: many(itineraryItems),
 }));
 
 export const bookingExperiencesRelations = relations(bookingExperiences, ({ one }) => ({
@@ -482,5 +622,6 @@ export type AccommodationOptionRow = typeof accommodationOptions.$inferSelect;
 export type ExperienceRow = typeof experiences.$inferSelect;
 export type BookingRow = typeof bookings.$inferSelect;
 export type BookingExperienceRow = typeof bookingExperiences.$inferSelect;
+export type ItineraryItemRow = typeof itineraryItems.$inferSelect;
 export type { StayType } from "@/lib/stay-types";
 export type { BookingStatus } from "@/lib/booking-status";

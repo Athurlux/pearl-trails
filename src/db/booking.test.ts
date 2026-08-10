@@ -6,6 +6,7 @@ import { getDb } from "@/db";
 import { accommodationOptions, bookings } from "@/db/schema";
 import {
   type CreateBookingInput,
+  type CreateBookingResult,
   createBookingRequest,
   getBookingByReference,
   getOptionAvailability,
@@ -17,6 +18,18 @@ config({ path: ".env.local", quiet: true });
 
 const hasDb = Boolean(process.env.DATABASE_URL);
 const suite = hasDb ? describe : describe.skip;
+
+/**
+ * The outcomes that carry a reference, derived from the union rather than
+ * spelled out.
+ *
+ * Hand-written predicates here broke the moment Release 5 added `tripToken` to
+ * the created case — they had restated the shape, so they had to be kept in
+ * step by hand. `Extract` cannot fall out of date.
+ */
+type BookedResult = Extract<CreateBookingResult, { reference: string }>;
+const hasReference = (result: CreateBookingResult): result is BookedResult =>
+  "reference" in result;
 
 /**
  * Booking integrity against the real Neon branch.
@@ -442,11 +455,7 @@ suite("idempotency and concurrency", () => {
       createBookingRequest(input),
     ]);
 
-    const references = [a, b]
-      .filter((r): r is { status: "created" | "duplicate"; reference: string } =>
-        r.status === "created" || r.status === "duplicate",
-      )
-      .map((r) => r.reference);
+    const references = [a, b].filter(hasReference).map((r) => r.reference);
 
     // Both callers get an answer, and it is the same booking.
     expect(references).toHaveLength(2);
@@ -484,7 +493,7 @@ suite("idempotency and concurrency", () => {
     ]);
 
     const references = results
-      .filter((r): r is { status: "created"; reference: string } => r.status === "created")
+      .filter((r) => r.status === "created")
       .map((r) => r.reference);
 
     expect(references.length).toBeGreaterThanOrEqual(3);
@@ -526,6 +535,10 @@ suite("database constraints are the final authority", () => {
       guest_email: `'raw${TEST_EMAIL_DOMAIN}'`,
       guest_phone: "'+256772000000'",
       guest_country: "'Uganda'",
+      // Release 5 made this NOT NULL. Any value distinct per row will do here —
+      // these rows are never opened as a trip, and the column is a hash, so a
+      // literal is honest about that rather than pretending to be a token.
+      trip_token_hash: "encode(sha256(gen_random_uuid()::text::bytea), 'hex')",
       ...overrides,
     };
     await db.execute(

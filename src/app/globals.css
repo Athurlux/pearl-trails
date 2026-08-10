@@ -80,3 +80,43 @@
     transition-duration: 0.001ms !important;
   }
 }
+
+/*
+  Print — the trip itinerary saved or taken along.
+
+  Travellers print a plan to carry it, so this strips the site furniture rather
+  than reproducing it in grey. `print:hidden` on individual controls handles the
+  editing affordances; this handles the chrome that every page carries.
+
+  Backgrounds are dropped instead of forced: a printer that honours
+  `print-color-adjust` would otherwise flood the page with ivory, and a printer
+  that ignores it would render forest-green text on white as near-black
+  anyway.
+*/
+@media print {
+  header, footer, nav { display: none !important; }
+
+  html, body {
+    background: #fff !important;
+    color: #000 !important;
+    font-size: 11pt;
+  }
+
+  main { padding: 0 !important; }
+
+  /* Sticky columns become part of the flow; a fixed sidebar prints once, in
+     the wrong place, on top of the first page. */
+  .lg\:sticky, [class*="sticky"] { position: static !important; }
+
+  /* Never split a day, or an item, across a page break. */
+  li, section { break-inside: avoid; }
+  h1, h2, h3 { break-after: avoid; }
+
+  a[href] { text-decoration: none; color: #000; }
+
+  /* Images are the first thing to cost ink and the last thing a printed
+     itinerary needs. */
+  img { display: none !important; }
+
+  input, textarea, select, button { display: none !important; }
+}

@@ -5,12 +5,18 @@ workflow live in `~/.claude/CLAUDE.md` and are **not** repeated here.
 
 ## Status
 
-**Release 4 shipped: reservation requests, with real availability.**
+**Release 5 shipped: My Trip — a day-by-day itinerary built from a real booking.**
 
 The catalogue lives in Neon Postgres and is the single source of truth. A traveller can
-now request a booking end to end and gets a persisted reference back. There is still no
-auth, no payment, no notification and no operator tooling. Do not add a queue, cache,
-search engine or background worker without a decision record in `docs/decisions/`.
+request a booking end to end, gets a persisted reference back, and can open a private
+trip page to plan their days. There is still no auth, no payment, no notification and no
+operator tooling. Do not add a queue, cache, search engine or background worker without
+a decision record in `docs/decisions/`.
+
+**Payments are deliberately not built.** Release 6 was scoped and then deferred by the
+product owner: there is no merchant account, and a payment layer that cannot take a real
+sandbox transaction end to end would be a claim the product cannot back. Nothing in the
+UI implies a payment exists. See `docs/decisions/005-payments-deferred.md`.
 
 ## What this is
 
@@ -73,6 +79,7 @@ server-side error while users only see the branded error page.
 | `/stays/[slug]` | dynamic | property detail: gallery, options, experiences |
 | `/book/[slug]` | dynamic | the booking flow; `noindex` |
 | `/booking/[reference]` | dynamic | confirmation; `noindex`, no social metadata |
+| `/trip/[token]` | dynamic | My Trip; `noindex`, `no-referrer`, no social metadata |
 
 **Trip context** (`src/lib/trip-params.ts`) is a second, smaller URL contract carried from
 Explore into a property and on into `/book`: `checkIn`, `checkOut`, `guests`, `option`,
@@ -123,6 +130,44 @@ Read `docs/decisions/001`–`003` before changing any of this. The short version
 Layering: `src/lib/booking-rules.ts` is pure and shared by client and server (validation,
 pricing, reference generation); `src/lib/booking-query.ts` is `server-only` and owns
 persistence; `src/app/book/[slug]/actions.ts` is the submission boundary.
+
+## My Trip (Release 5)
+
+Read `docs/decisions/004` before changing any of this.
+
+- **The trip token is the credential, and the reference is not.** 160 bits at
+  `/trip/[token]`; only a SHA-256 hash is stored. The reference still opens the read-only
+  confirmation page, as in Release 4 — it does not open the trip.
+- **Two ways in, and no third.** The submit redirect carries the token once
+  (`/booking/REF?trip=…`, validated against that booking before the link is rendered), or
+  the traveller proves the email on the booking and gets a **new** token. Recovery
+  rotates, because a hash cannot be un-hashed; the form says so before it is submitted.
+- **`itinerary_items.source` is an access-control column, not a display category.**
+  `system` (check-in/out) is untouchable, `experience` may be moved but never deleted,
+  `traveller` is theirs. Enforced in the `WHERE` clause of every mutation, so posting
+  someone else's item id changes nothing.
+- **Generation is idempotent by constraint.** Opening a trip runs
+  `INSERT … ON CONFLICT DO NOTHING` against two **partial** unique indexes. The
+  `ON CONFLICT` clause must repeat each index's `WHERE` predicate — Postgres refuses to
+  infer a partial index otherwise, and fails with 42P10, which reads like a missing index
+  rather than a missing predicate.
+- **The first visit is the backfill.** Release 4 bookings get their itinerary when
+  someone opens the trip. There is no backfill migration to run or forget.
+- **Traveller dates are bounded inside the write**: the insert selects from `bookings`
+  and filters on the booking's own dates, so there is no window between checking and
+  writing. A `CHECK` constraint cannot see the parent row.
+- **Only check-in and check-out carry a clock time**, taken from the property. Everything
+  else is morning/afternoon/evening/flexible, because nothing has been scheduled with a
+  guide or a permit office.
+
+Layering mirrors booking: `src/lib/trip-rules.ts` is pure (token minting, deterministic
+planning, ordering, validation), `src/lib/trip-query.ts` is `server-only` and owns
+persistence and access, `src/app/trip/[token]/actions.ts` is the mutation boundary.
+
+**Do not add `revalidatePath` to the trip actions.** `/trip/[token]` renders dynamically,
+so there is no cache entry to invalidate — the call is a no-op that reads like a refresh,
+and an added item only appeared after a manual reload. The client island calls
+`router.refresh()` on success instead.
 
 **`actions.ts` may export only async functions.** A `"use server"` file that exports a
 constant fails at request time with "A 'use server' file can only export async functions"
@@ -242,11 +287,18 @@ Booking tests write rows tagged `@booking-test.invalid` (an RFC 2606 reserved TL
 clean up by that marker, never by date range — the Neon branch is shared with demo data.
 `npm run test` needs `DATABASE_URL`; without it the DB suites skip themselves.
 
-**That marker is a delete list, so never give a booking you want to keep an
-`@booking-test.invalid` address.** A demo reservation created with one survives until the
-next `npm run test`, then vanishes — including from production, which is the same Neon
-branch. Demo bookings use `@pearltrails.example` (also reserved, also undeliverable, but
-not swept). Scratch scripts belong in `tmp/`, which is ignored by git, eslint and tsc.
+**Those markers are delete lists, so never give a booking you want to keep one.** A demo
+reservation created with a swept address survives until the next `npm run test`, then
+vanishes — including from production, which is the same Neon branch. Demo bookings use
+`@pearltrails.example` (also reserved, also undeliverable, but not swept). Scratch
+scripts belong in `tmp/`, which is ignored by git, eslint and tsc.
+
+**Each DB test file needs its own marker.** `booking.test.ts` owns
+`@booking-test.invalid` and `trip.test.ts` owns `@trip-test.invalid`. Vitest runs files
+in parallel, so when they shared one, each file's `beforeAll` cleanup deleted the other's
+rows mid-run: booking assertions watched a sold-out unit become available, and trip
+assertions hit foreign-key failures against bookings removed underneath them. Both suites
+were correct; their isolation was not. A new DB suite takes a new marker.
 
 <!-- BEGIN:nextjs-agent-rules -->
 

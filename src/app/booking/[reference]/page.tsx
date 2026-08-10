@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Footer } from "@/components/layout/Footer";
 import { Header } from "@/components/layout/Header";
+import { TripLinkRequest } from "@/components/trip/TripLinkRequest";
 import { getBookingByReference } from "@/lib/booking-query";
 import { maskEmail, maskPhone, parseBookingReference } from "@/lib/booking-rules";
 import {
@@ -13,6 +14,8 @@ import {
 } from "@/lib/booking-status";
 import { formatUgx } from "@/lib/format";
 import { formatDateRange } from "@/lib/trip-params";
+import { tokenMatchesReference } from "@/lib/trip-query";
+import { tripHref } from "@/lib/trip-rules";
 
 /**
  * The confirmation page.
@@ -28,6 +31,7 @@ import { formatDateRange } from "@/lib/trip-params";
 
 interface Props {
   params: Promise<{ reference: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 /**
@@ -56,8 +60,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-export default async function BookingConfirmationPage({ params }: Props) {
-  const { reference } = await params;
+export default async function BookingConfirmationPage({ params, searchParams }: Props) {
+  const [{ reference }, query] = await Promise.all([params, searchParams]);
 
   // Reject a malformed reference before touching the database: a bad path
   // segment becomes a 404, not a query.
@@ -68,6 +72,20 @@ export default async function BookingConfirmationPage({ params }: Props) {
   // An unknown reference is simply not found. There is no distinction between
   // "no such booking" and "not yours", because there is no owner yet.
   if (!booking) notFound();
+
+  /*
+    The trip credential, if the submit redirect just handed it over.
+
+    It is checked against *this* booking rather than trusted, so pasting
+    somebody else's token onto this URL reveals nothing. When it is absent — a
+    later visit, or a bookmarked confirmation — the page offers the email path
+    instead of a direct link. See docs/decisions/004.
+  */
+  const offeredToken = typeof query.trip === "string" ? query.trip : null;
+  const tripToken =
+    offeredToken && (await tokenMatchesReference(parsed, offeredToken))
+      ? offeredToken
+      : null;
 
   const dates = formatDateRange(booking.checkIn, booking.checkOut);
   const status = booking.status as BookingStatus;
@@ -100,6 +118,40 @@ export default async function BookingConfirmationPage({ params }: Props) {
               </p>
             </div>
           </div>
+
+          {/* --------------------------------------------------------------
+              My Trip (Release 5).
+
+              Two states, and which one shows is a security decision, not a
+              layout one: a verified token gives a direct link, anything else
+              gets the email check. The confirmation page itself never reveals
+              a token it was not handed.
+             -------------------------------------------------------------- */}
+          <section className="mt-8 rounded-sm border border-forest/20 bg-forest/[0.03] px-5 py-5 sm:px-6">
+            <h2 className="text-[1.1rem] text-forest">Plan your days</h2>
+            <p className="mt-1.5 max-w-lg text-[0.88rem] leading-relaxed text-muted">
+              Your trip page lays out {booking.nights === 1 ? "the night" : "each day"} of
+              this stay, with your requested experiences already on it. You can add your
+              own plans and save notes.
+            </p>
+
+            {tripToken ? (
+              <>
+                <Link
+                  href={tripHref(tripToken)}
+                  className="mt-4 inline-block rounded-sm bg-forest px-6 py-3 text-[0.88rem] font-medium tracking-wide text-ivory transition-colors hover:bg-forest-soft"
+                >
+                  Open my trip
+                </Link>
+                <p className="mt-3 text-[0.79rem] leading-relaxed text-muted">
+                  That link is private and is the only key to your trip — bookmark it, and
+                  share it only with the people travelling with you.
+                </p>
+              </>
+            ) : (
+              <TripLinkRequest reference={booking.reference} />
+            )}
+          </section>
 
           <section className="mt-9 overflow-hidden rounded-sm border border-line">
             <div className="relative aspect-[21/9] w-full">

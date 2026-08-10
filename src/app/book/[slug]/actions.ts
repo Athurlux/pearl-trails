@@ -65,12 +65,29 @@ export async function submitBookingRequest(
     },
   });
 
+  let tripToken: string | null = null;
+
   switch (result.status) {
     case "created":
+      /*
+        The trip credential rides along in the redirect, once.
+
+        The confirmation page validates it against this booking and, if it
+        matches, shows a direct link to the trip planner — so the traveller who
+        just booked reaches their itinerary without proving anything twice.
+        Only a hash is stored, so this is the sole moment it can be handed over.
+
+        It is a random token, not personal data: decision 003's rule is that
+        traveller PII stays out of the URL, and a credential is not PII.
+      */
+      tripToken = result.tripToken;
+      break;
     case "duplicate":
       // A replay lands on the same confirmation page as the original. From the
       // traveller's side a double submit is indistinguishable from one submit,
-      // which is the whole point of the request token.
+      // which is the whole point of the request token. There is no token to
+      // pass on — the first submission received it — so the confirmation page
+      // offers the email path instead.
       break;
     case "invalid":
       return { status: "invalid", errors: result.errors, formError: result.formError };
@@ -82,5 +99,9 @@ export async function submitBookingRequest(
 
   // Outside the switch and outside any try/catch: `redirect` works by throwing,
   // so catching it here would swallow the navigation.
-  redirect(`/booking/${result.reference}`);
+  redirect(
+    tripToken
+      ? `/booking/${result.reference}?trip=${tripToken}`
+      : `/booking/${result.reference}`,
+  );
 }
